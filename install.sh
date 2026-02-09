@@ -78,12 +78,22 @@ ask "GitHub remote URL (leave empty to skip):"
 read -r REMOTE_URL
 
 if [[ -n "$REMOTE_URL" ]]; then
+    # If the URL doesn't already contain a token, offer to add one
+    if [[ "$REMOTE_URL" != *"@github.com"* && "$REMOTE_URL" == https://github.com/* ]]; then
+        ask "Personal Access Token (leave empty for no auth):"
+        read -r GIT_TOKEN
+        if [[ -n "$GIT_TOKEN" ]]; then
+            REMOTE_URL="${REMOTE_URL/https:\/\/github.com/https://x-access-token:${GIT_TOKEN}@github.com}"
+            ok "Token embedded in remote URL."
+        fi
+    fi
+
     if git remote get-url origin &>/dev/null; then
         git remote set-url origin "$REMOTE_URL"
-        ok "Updated remote 'origin' to ${REMOTE_URL}"
+        ok "Updated remote 'origin'."
     else
         git remote add origin "$REMOTE_URL"
-        ok "Added remote 'origin' as ${REMOTE_URL}"
+        ok "Added remote 'origin'."
     fi
     sed_inplace "s|^GIT_REMOTE=.*|GIT_REMOTE=\"origin\"|" config.sh
     ok "Set GIT_REMOTE=origin in config.sh"

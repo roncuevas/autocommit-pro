@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# autocommit-pro — Configuration File
+# Copy this file to config.sh and adjust values as needed.
+# install.sh does this automatically.
+
+# ── Commit Range ──────────────────────────────────────────────
+# Number of commits per execution (random between MIN and MAX)
+MIN_COMMITS=1
+MAX_COMMITS=5
+
+# ── Frequency ─────────────────────────────────────────────────
+# How often autocommit should run:
+#   "daily"     — every day
+#   "weekly"    — one specific day per week (see WEEKLY_DAY)
+#   "every2days"— every other day (even epoch-days)
+#   "random"    — probabilistic (see RANDOM_CHANCE)
+FREQUENCY="daily"
+
+# Day of the week for "weekly" mode (1=Mon … 7=Sun)
+WEEKLY_DAY=1
+
+# Probability (1-100) of committing when FREQUENCY="random"
+RANDOM_CHANCE=50
+
+# ── Cron Schedule ─────────────────────────────────────────────
+# Hour and minute for the cron job (24h format)
+CRON_HOUR=9
+CRON_MINUTE=30
+
+# ── Git Remote ────────────────────────────────────────────────
+# Leave empty to skip push after commits
+GIT_REMOTE=""
+GIT_BRANCH="main"
+
+# ── Install Directory (auto-set by install.sh) ───────────────
+INSTALL_DIR=""

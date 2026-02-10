@@ -93,6 +93,13 @@ if [[ -n "$REMOTE_URL" ]]; then
     fi
     sed_inplace "s|^GIT_REMOTE=.*|GIT_REMOTE=\"origin\"|" config.sh
     ok "Set GIT_REMOTE=origin in config.sh"
+
+    # Initial push to sync repo/ with remote
+    if git -C "$REPO_DIR" push -u origin main --force --quiet 2>/dev/null; then
+        ok "Initial push to remote completed."
+    else
+        info "Could not push to remote. You may need to push manually."
+    fi
 else
     info "No remote configured. You can add one later in config.sh."
 fi

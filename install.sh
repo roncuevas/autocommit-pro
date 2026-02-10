@@ -97,10 +97,6 @@ else
     info "No remote configured. You can add one later in config.sh."
 fi
 
-# ── Make scripts executable ───────────────────────────────────
-chmod +x autocommit.sh install.sh uninstall.sh 2>/dev/null || true
-ok "Scripts marked as executable."
-
 # ── Cron job ──────────────────────────────────────────────────
 CRON_CMD="${CRON_MINUTE:-30} ${CRON_HOUR:-9} * * * /usr/bin/env bash ${SCRIPT_DIR}/autocommit.sh # autocommit-pro"
 

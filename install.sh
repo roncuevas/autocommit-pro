@@ -56,7 +56,8 @@ if [[ ! -d "$REPO_DIR/.git" ]]; then
     echo "# autocommit-pro — contribution log" > "$REPO_DIR/contributions.log"
     git -C "$REPO_DIR" add contributions.log
     git -C "$REPO_DIR" commit -m "init: autocommit-pro" --quiet
-    ok "Created repo/ with clean git history."
+    git -C "$REPO_DIR" branch -M main
+    ok "Created repo/ with clean git history (branch: main)."
 else
     info "repo/ already initialized — skipping."
 fi

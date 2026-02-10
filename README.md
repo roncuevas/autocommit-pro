@@ -20,12 +20,13 @@ bash install.sh
 
 El instalador se encarga de:
 
-1. Inicializar el repositorio git (si no existe)
-2. Crear `config.sh` a partir del template
-3. Crear `data/contributions.log` con un commit inicial
-4. Preguntar por la URL del remote de GitHub (opcional)
-5. Dar permisos de ejecucion a los scripts
-6. Instalar el cron job
+1. Crear `config.sh` a partir del template
+2. Crear `repo/` con su propio repositorio git y `contributions.log`
+3. Preguntar por la URL del remote de GitHub (opcional, acepta token embebido)
+4. Dar permisos de ejecucion a los scripts
+5. Instalar el cron job
+
+> **Nota:** `repo/` es un repositorio git independiente de autocommit-pro. Esto permite hacer `git pull` en autocommit-pro para recibir actualizaciones sin mezclar el historial con tus contribuciones.
 
 ### macOS: Full Disk Access
 
@@ -127,16 +128,16 @@ rm -rf autocommit-pro
 ## Estructura del proyecto
 
 ```
-autocommit-pro/
-├── autocommit.sh          # Script principal
-├── config.sh.example      # Template de configuracion
-├── config.sh              # Tu configuracion (ignorado por git)
-├── install.sh             # Instalador
-├── uninstall.sh           # Desinstalador
+autocommit-pro/                ← repo del tool (git pull para updates)
+├── autocommit.sh              # Script principal
+├── config.sh.example          # Template de configuracion
+├── config.sh                  # Tu configuracion (ignorado por git)
+├── install.sh                 # Instalador
+├── uninstall.sh               # Desinstalador
 ├── .gitignore
-├── autocommit.log         # Log de ejecuciones (ignorado por git)
-└── data/
-    └── contributions.log  # Archivo modificado en cada commit
+├── autocommit.log             # Log de ejecuciones (ignorado por git)
+└── repo/                      ← repo separado (origin = tu repo de contribuciones)
+    └── contributions.log      # Archivo modificado en cada commit
 ```
 
 ## Como funciona
@@ -144,6 +145,6 @@ autocommit-pro/
 1. `autocommit.sh` carga la configuracion de `config.sh`
 2. Evalua si debe ejecutar hoy segun la frecuencia configurada
 3. Calcula un numero aleatorio de commits dentro del rango definido
-4. Por cada commit, agrega una linea con timestamp a `data/contributions.log`, la agrega al staging y hace commit
+4. Por cada commit, agrega una linea con timestamp a `repo/contributions.log`, la agrega al staging y hace commit
 5. Si hay un remote configurado, hace push automaticamente
 6. Todo queda registrado en `autocommit.log`

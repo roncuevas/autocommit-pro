@@ -74,10 +74,16 @@ fi
 
 # ── Remote setup (optional) ──────────────────────────────────
 echo ""
-ask "GitHub remote URL (leave empty to skip):"
+ask "GitHub remote URL starting with https:// (leave empty to skip):"
 read -r REMOTE_URL
 
 if [[ -n "$REMOTE_URL" ]]; then
+    # Validate that the URL starts with https://
+    if [[ "$REMOTE_URL" != https://* ]]; then
+        err "URL must start with https:// (e.g. https://github.com/user/repo.git)"
+        exit 1
+    fi
+
     # If the URL doesn't already contain a token, offer to add one
     if [[ "$REMOTE_URL" != *"@github.com"* && "$REMOTE_URL" == https://github.com/* ]]; then
         ask "Personal Access Token (leave empty for no auth):"

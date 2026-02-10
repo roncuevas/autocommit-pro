@@ -11,7 +11,8 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_FILE="${SCRIPT_DIR}/config.sh"
 LOG_FILE="${SCRIPT_DIR}/autocommit.log"
-DATA_FILE="${SCRIPT_DIR}/data/contributions.log"
+REPO_DIR="${SCRIPT_DIR}/repo"
+DATA_FILE="${REPO_DIR}/contributions.log"
 
 # ── Load configuration ────────────────────────────────────────
 if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -25,6 +26,12 @@ source "$CONFIG_FILE"
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
 }
+
+# ── Verify repo directory ────────────────────────────────────
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+    log "ERROR: repo/ directory not initialized. Run install.sh first."
+    exit 1
+fi
 
 # ── Frequency gate ────────────────────────────────────────────
 should_run_today() {
@@ -67,12 +74,12 @@ NUM_COMMITS=$(( RANDOM % (MAX_COMMITS - MIN_COMMITS + 1) + MIN_COMMITS ))
 log "START: Will create ${NUM_COMMITS} commit(s)."
 
 # ── Perform commits ──────────────────────────────────────────
-cd "$SCRIPT_DIR"
+cd "$REPO_DIR"
 
 for (( i = 1; i <= NUM_COMMITS; i++ )); do
     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
     echo "${TIMESTAMP} — autocommit #${i}/${NUM_COMMITS}" >> "$DATA_FILE"
-    git add data/contributions.log
+    git add contributions.log
     git commit -m "autocommit: ${TIMESTAMP}" --quiet
     log "COMMIT ${i}/${NUM_COMMITS}: autocommit: ${TIMESTAMP}"
 done

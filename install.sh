@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # autocommit-pro — Installer
-# Sets up the repo, config, data file, and cron job.
+# Sets up the config, contribution repo, and cron job.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="${SCRIPT_DIR}/repo"
 
 # ── Helpers ───────────────────────────────────────────────────
 info()  { echo "  [INFO]  $*"; }
@@ -34,17 +35,9 @@ for cmd in git crontab date; do
 done
 ok "Prerequisites found (git, crontab, date)."
 
-# ── Git init ──────────────────────────────────────────────────
+# ── Config file ───────────────────────────────────────────────
 cd "$SCRIPT_DIR"
 
-if [[ ! -d .git ]]; then
-    git init --quiet
-    ok "Initialized git repository."
-else
-    ok "Git repository already exists."
-fi
-
-# ── Config file ───────────────────────────────────────────────
 if [[ ! -f config.sh ]]; then
     cp config.sh.example config.sh
     sed_inplace "s|^INSTALL_DIR=.*|INSTALL_DIR=\"${SCRIPT_DIR}\"|" config.sh
@@ -56,20 +49,16 @@ fi
 # Source config for cron schedule values
 source config.sh
 
-# ── Data directory and initial commit ─────────────────────────
-mkdir -p data
-
-if [[ ! -f data/contributions.log ]]; then
-    echo "# autocommit-pro — contribution log" > data/contributions.log
-    git add .gitignore config.sh.example data/contributions.log
-    # Add autocommit.sh, install.sh, uninstall.sh if they exist
-    for f in autocommit.sh install.sh uninstall.sh; do
-        [[ -f "$f" ]] && git add "$f"
-    done
-    git commit -m "Initial commit: autocommit-pro setup" --quiet
-    ok "Created data/contributions.log and initial commit."
+# ── Contribution repo (separate from autocommit-pro) ─────────
+if [[ ! -d "$REPO_DIR/.git" ]]; then
+    mkdir -p "$REPO_DIR"
+    git init --quiet "$REPO_DIR"
+    echo "# autocommit-pro — contribution log" > "$REPO_DIR/contributions.log"
+    git -C "$REPO_DIR" add contributions.log
+    git -C "$REPO_DIR" commit -m "init: autocommit-pro" --quiet
+    ok "Created repo/ with clean git history."
 else
-    info "data/contributions.log already exists — skipping initial commit."
+    info "repo/ already initialized — skipping."
 fi
 
 # ── Remote setup (optional) ──────────────────────────────────
@@ -94,11 +83,11 @@ if [[ -n "$REMOTE_URL" ]]; then
         fi
     fi
 
-    if git remote get-url origin &>/dev/null; then
-        git remote set-url origin "$REMOTE_URL"
+    if git -C "$REPO_DIR" remote get-url origin &>/dev/null; then
+        git -C "$REPO_DIR" remote set-url origin "$REMOTE_URL"
         ok "Updated remote 'origin'."
     else
-        git remote add origin "$REMOTE_URL"
+        git -C "$REPO_DIR" remote add origin "$REMOTE_URL"
         ok "Added remote 'origin'."
     fi
     sed_inplace "s|^GIT_REMOTE=.*|GIT_REMOTE=\"origin\"|" config.sh

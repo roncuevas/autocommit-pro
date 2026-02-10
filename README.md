@@ -13,20 +13,37 @@ Compatible con **macOS** y **Linux**.
 ## Instalacion
 
 ```bash
-git clone <tu-repo-url> autocommit-pro
+git clone https://github.com/roncuevas/autocommit-pro.git
 cd autocommit-pro
-bash install.sh
+./install.sh
 ```
 
 El instalador se encarga de:
 
 1. Crear `config.sh` a partir del template
 2. Crear `repo/` con su propio repositorio git y `contributions.log`
-3. Preguntar por la URL del remote de GitHub (opcional, acepta token embebido)
-4. Dar permisos de ejecucion a los scripts
-5. Instalar el cron job
+3. Preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
+4. Si la URL no incluye token, pregunta por un Personal Access Token (opcional)
+5. Hacer push inicial al remote
+6. Instalar el cron job
 
-> **Nota:** `repo/` es un repositorio git independiente de autocommit-pro. Esto permite hacer `git pull` en autocommit-pro para recibir actualizaciones sin mezclar el historial con tus contribuciones.
+### Autenticacion con token
+
+El instalador acepta dos formas de autenticacion:
+
+- **URL con token embebido:** pegar directamente la URL completa
+  ```
+  https://x-access-token:github_pat_XXXX@github.com/user/repo.git
+  ```
+- **URL + token por separado:** pegar `https://github.com/user/repo.git` y el instalador pregunta por el token
+
+### Repos separados
+
+`repo/` es un repositorio git independiente de autocommit-pro. Esto permite:
+
+- Hacer `git pull` en autocommit-pro para recibir actualizaciones del tool
+- Mantener el historial de contribuciones separado del historial de desarrollo
+- Apuntar `repo/` a cualquier repo de GitHub sin mezclar historiales
 
 ### macOS: Full Disk Access
 
@@ -76,7 +93,7 @@ CRON_HOUR=9     # Hora (formato 24h)
 CRON_MINUTE=30  # Minuto
 ```
 
-Para aplicar cambios de horario, ejecuta `bash install.sh` de nuevo.
+Para aplicar cambios de horario, ejecuta `./install.sh` de nuevo.
 
 ### Git remote
 
@@ -94,7 +111,7 @@ Una vez instalado, el cron job ejecuta `autocommit.sh` automaticamente segun el 
 ### Ejecucion manual
 
 ```bash
-bash autocommit.sh
+./autocommit.sh
 ```
 
 ### Verificar cron
@@ -113,10 +130,18 @@ Los eventos se registran en `autocommit.log`:
 cat autocommit.log
 ```
 
+### Actualizar autocommit-pro
+
+```bash
+git pull
+```
+
+Esto actualiza el tool sin afectar tus contribuciones en `repo/`.
+
 ## Desinstalacion
 
 ```bash
-bash uninstall.sh
+./uninstall.sh
 ```
 
 Esto remueve unicamente el cron job. Los archivos y el repositorio **no se eliminan**. Para una limpieza completa, borra el directorio manualmente:

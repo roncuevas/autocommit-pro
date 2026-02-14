@@ -183,12 +183,27 @@ La unica variable requerida es `REMOTE_URL` (con token embebido). El resto tiene
 | `GIT_BRANCH` | `main` | Branch para push |
 | `TZ` | `UTC` | Zona horaria (ej: `America/Mexico_City`) |
 
+### Docker Compose
+
+Crea un archivo `.env` con tus variables:
+
+```bash
+REMOTE_URL=https://x-access-token:ghp_XXX@github.com/user/repo.git
+TZ=America/Mexico_City
+```
+
+Y levanta el contenedor:
+
+```bash
+docker compose up -d
+```
+
 ### Comandos utiles
 
 ```bash
-docker logs autocommit           # Ver logs del contenedor
-docker stop autocommit           # Detener
-docker rm autocommit             # Eliminar contenedor
+docker compose logs -f           # Ver logs en tiempo real
+docker compose down              # Detener y eliminar contenedor
+docker compose up -d --build     # Rebuild y reiniciar
 ```
 
 ## Desinstalacion
@@ -213,6 +228,7 @@ autocommit-pro/                ← repo del tool (git pull para updates)
 ├── install.sh                 # Instalador
 ├── uninstall.sh               # Desinstalador
 ├── Dockerfile                 # Imagen Docker
+├── docker-compose.yml         # Docker Compose
 ├── entrypoint.sh              # Entrypoint del contenedor
 ├── .dockerignore
 ├── .gitignore

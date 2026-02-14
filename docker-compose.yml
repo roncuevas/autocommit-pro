@@ -1,0 +1,15 @@
+services:
+  autocommit:
+    build: .
+    environment:
+      - REMOTE_URL=${REMOTE_URL}
+      - MIN_COMMITS=${MIN_COMMITS:-1}
+      - MAX_COMMITS=${MAX_COMMITS:-5}
+      - FREQUENCY=${FREQUENCY:-daily}
+      - WEEKLY_DAY=${WEEKLY_DAY:-1}
+      - RANDOM_CHANCE=${RANDOM_CHANCE:-50}
+      - CRON_HOUR=${CRON_HOUR:-9}
+      - CRON_MINUTE=${CRON_MINUTE:-30}
+      - GIT_BRANCH=${GIT_BRANCH:-main}
+      - TZ=${TZ:-UTC}
+    restart: unless-stopped

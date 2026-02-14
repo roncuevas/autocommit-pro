@@ -102,6 +102,12 @@ GIT_REMOTE=""      # Nombre del remote (ej: "origin"). Vacio = sin push
 GIT_BRANCH="main"  # Branch para push
 ```
 
+### Directorio de instalacion
+
+```bash
+INSTALL_DIR=""     # Auto-configurado por install.sh. No editar manualmente.
+```
+
 ## Uso
 
 ### Ejecucion automatica

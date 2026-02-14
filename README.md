@@ -144,6 +144,53 @@ git pull
 
 Esto actualiza el tool sin afectar tus contribuciones en `repo/`.
 
+## Docker
+
+Tambien puedes ejecutar autocommit-pro en un contenedor Docker, ideal para desplegar en un VPS o cualquier servidor con Docker.
+
+### Build
+
+```bash
+docker build -t autocommit-pro .
+```
+
+### Run
+
+```bash
+docker run -d --name autocommit \
+  -e REMOTE_URL="https://x-access-token:ghp_XXX@github.com/user/repo.git" \
+  -e FREQUENCY=daily \
+  -e MIN_COMMITS=1 \
+  -e MAX_COMMITS=5 \
+  -e TZ=America/Mexico_City \
+  autocommit-pro
+```
+
+La unica variable requerida es `REMOTE_URL` (con token embebido). El resto tiene valores por defecto.
+
+### Variables de entorno
+
+| Variable | Default | Descripcion |
+|---|---|---|
+| `REMOTE_URL` | (requerido) | URL con token: `https://x-access-token:TOKEN@github.com/user/repo.git` |
+| `MIN_COMMITS` | `1` | Minimo de commits por ejecucion |
+| `MAX_COMMITS` | `5` | Maximo de commits por ejecucion |
+| `FREQUENCY` | `daily` | `daily` / `weekly` / `every2days` / `random` |
+| `WEEKLY_DAY` | `1` | Dia para modo weekly (1=Lun ... 7=Dom) |
+| `RANDOM_CHANCE` | `50` | Probabilidad (1-100) para modo random |
+| `CRON_HOUR` | `9` | Hora del cron (formato 24h) |
+| `CRON_MINUTE` | `30` | Minuto del cron |
+| `GIT_BRANCH` | `main` | Branch para push |
+| `TZ` | `UTC` | Zona horaria (ej: `America/Mexico_City`) |
+
+### Comandos utiles
+
+```bash
+docker logs autocommit           # Ver logs del contenedor
+docker stop autocommit           # Detener
+docker rm autocommit             # Eliminar contenedor
+```
+
 ## Desinstalacion
 
 ```bash
@@ -165,6 +212,9 @@ autocommit-pro/                ← repo del tool (git pull para updates)
 ├── config.sh                  # Tu configuracion (ignorado por git)
 ├── install.sh                 # Instalador
 ├── uninstall.sh               # Desinstalador
+├── Dockerfile                 # Imagen Docker
+├── entrypoint.sh              # Entrypoint del contenedor
+├── .dockerignore
 ├── .gitignore
 ├── autocommit.log             # Log de ejecuciones (ignorado por git)
 └── repo/                      ← repo separado (origin = tu repo de contribuciones)

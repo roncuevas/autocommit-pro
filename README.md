@@ -1,8 +1,10 @@
 # autocommit-pro
 
-Script bash que automatiza commits diarios para llenar tu grafico de contribuciones de GitHub. Configurable con frecuencia flexible, rango de commits por ejecucion y push automatico via cron. Sin dependencias externas: solo bash, git y cron.
+Script bash que automatiza commits diarios para llenar tu grafico de contribuciones de GitHub. Configurable con frecuencia flexible, rango de commits por ejecucion y push automatico via cron.
 
 ## Requisitos
+
+### Instalacion local
 
 - bash 3.2+
 - git
@@ -10,7 +12,11 @@ Script bash que automatiza commits diarios para llenar tu grafico de contribucio
 
 Compatible con **macOS** y **Linux**.
 
-## Instalacion
+### Docker
+
+- Docker (y opcionalmente Docker Compose)
+
+## Instalacion local
 
 ```bash
 git clone https://github.com/roncuevas/autocommit-pro.git
@@ -144,19 +150,35 @@ git pull
 
 Esto actualiza el tool sin afectar tus contribuciones en `repo/`.
 
-## Docker
+## Instalacion con Docker
 
-Tambien puedes ejecutar autocommit-pro en un contenedor Docker, ideal para desplegar en un VPS o cualquier servidor con Docker.
+Ideal para desplegar en un VPS o cualquier servidor con Docker.
 
-### Build
+### Docker Compose (recomendado)
+
+```bash
+git clone https://github.com/roncuevas/autocommit-pro.git
+cd autocommit-pro
+```
+
+Crea un archivo `.env` con tus variables:
+
+```bash
+REMOTE_URL=https://x-access-token:ghp_XXX@github.com/user/repo.git
+TZ=America/Mexico_City
+```
+
+Y levanta el contenedor:
+
+```bash
+docker compose up -d
+```
+
+### Docker run
 
 ```bash
 docker build -t autocommit-pro .
-```
 
-### Run
-
-```bash
 docker run -d --name autocommit \
   -e REMOTE_URL="https://x-access-token:ghp_XXX@github.com/user/repo.git" \
   -e FREQUENCY=daily \
@@ -182,21 +204,6 @@ La unica variable requerida es `REMOTE_URL` (con token embebido). El resto tiene
 | `CRON_MINUTE` | `30` | Minuto del cron |
 | `GIT_BRANCH` | `main` | Branch para push |
 | `TZ` | `UTC` | Zona horaria (ej: `America/Mexico_City`) |
-
-### Docker Compose
-
-Crea un archivo `.env` con tus variables:
-
-```bash
-REMOTE_URL=https://x-access-token:ghp_XXX@github.com/user/repo.git
-TZ=America/Mexico_City
-```
-
-Y levanta el contenedor:
-
-```bash
-docker compose up -d
-```
 
 ### Comandos utiles
 

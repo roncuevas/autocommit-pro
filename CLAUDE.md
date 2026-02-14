@@ -39,6 +39,8 @@ git pull               # Update tool without affecting repo/
 ## Conventions
 
 - Commit messages follow **Conventional Commits** format (e.g., `docs:`, `feat:`, `fix:`).
+- **Never** add `Co-Authored-By` or any co-author trailer to commits.
+- Prefer small, atomic commits — one logical change per commit.
 - All scripts use `set -euo pipefail`.
 - Cron entries are tagged with `# autocommit-pro` for reliable add/remove.
 - `config.sh` is gitignored; `config.sh.example` is tracked.

@@ -22,6 +22,16 @@ sed_inplace() {
     fi
 }
 
+# Set a config value: replace if line exists, append if not.
+set_config() {
+    local key="$1" value="$2"
+    if grep -q "^${key}=" config.sh; then
+        sed_inplace "s|^${key}=.*|${key}=${value}|" config.sh
+    else
+        echo "${key}=${value}" >> config.sh
+    fi
+}
+
 # Prompt for a value, showing current default. Enter keeps current value.
 ask_or_keep() {
     local prompt="$1" current="$2" varname="$3"
@@ -108,16 +118,16 @@ fi
 ask_or_keep "Cron hour (0-23)" "${CRON_HOUR:-9}" INPUT_CRON_HOUR
 ask_or_keep "Cron minute (0-59)" "${CRON_MINUTE:-30}" INPUT_CRON_MINUTE
 
-# Write all values to config.sh
-sed_inplace "s|^GIT_USER_NAME=.*|GIT_USER_NAME=\"${INPUT_GIT_NAME}\"|" config.sh
-sed_inplace "s|^GIT_USER_EMAIL=.*|GIT_USER_EMAIL=\"${INPUT_GIT_EMAIL}\"|" config.sh
-sed_inplace "s|^MIN_COMMITS=.*|MIN_COMMITS=${INPUT_MIN_COMMITS}|" config.sh
-sed_inplace "s|^MAX_COMMITS=.*|MAX_COMMITS=${INPUT_MAX_COMMITS}|" config.sh
-sed_inplace "s|^FREQUENCY=.*|FREQUENCY=\"${INPUT_FREQUENCY}\"|" config.sh
-sed_inplace "s|^WEEKLY_DAY=.*|WEEKLY_DAY=${INPUT_WEEKLY_DAY}|" config.sh
-sed_inplace "s|^RANDOM_CHANCE=.*|RANDOM_CHANCE=${INPUT_RANDOM_CHANCE}|" config.sh
-sed_inplace "s|^CRON_HOUR=.*|CRON_HOUR=${INPUT_CRON_HOUR}|" config.sh
-sed_inplace "s|^CRON_MINUTE=.*|CRON_MINUTE=${INPUT_CRON_MINUTE}|" config.sh
+# Write all values to config.sh (adds missing keys, updates existing ones)
+set_config "GIT_USER_NAME" "\"${INPUT_GIT_NAME}\""
+set_config "GIT_USER_EMAIL" "\"${INPUT_GIT_EMAIL}\""
+set_config "MIN_COMMITS" "${INPUT_MIN_COMMITS}"
+set_config "MAX_COMMITS" "${INPUT_MAX_COMMITS}"
+set_config "FREQUENCY" "\"${INPUT_FREQUENCY}\""
+set_config "WEEKLY_DAY" "${INPUT_WEEKLY_DAY}"
+set_config "RANDOM_CHANCE" "${INPUT_RANDOM_CHANCE}"
+set_config "CRON_HOUR" "${INPUT_CRON_HOUR}"
+set_config "CRON_MINUTE" "${INPUT_CRON_MINUTE}"
 ok "Configuration saved."
 
 # Reload config with new values
@@ -171,7 +181,7 @@ if [[ -n "$REMOTE_URL" ]]; then
         git -C "$REPO_DIR" remote add origin "$REMOTE_URL"
         ok "Added remote 'origin'."
     fi
-    sed_inplace "s|^GIT_REMOTE=.*|GIT_REMOTE=\"origin\"|" config.sh
+    set_config "GIT_REMOTE" "\"origin\""
     ok "Set GIT_REMOTE=origin in config.sh"
 
     # Initial push to sync repo/ with remote

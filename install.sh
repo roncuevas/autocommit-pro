@@ -49,10 +49,36 @@ fi
 # Source config for cron schedule values
 source config.sh
 
+# ── Git identity ─────────────────────────────────────────────
+echo ""
+info "GitHub requires commits to use an email linked to your account."
+info "Find your email at: https://github.com/settings/emails"
+echo ""
+
+ask "Git user name (e.g. John Doe):"
+read -r INPUT_GIT_NAME
+if [[ -z "$INPUT_GIT_NAME" ]]; then
+    err "Git user name is required for GitHub to recognize your contributions."
+    exit 1
+fi
+
+ask "Git email (must match your GitHub account):"
+read -r INPUT_GIT_EMAIL
+if [[ -z "$INPUT_GIT_EMAIL" ]]; then
+    err "Git email is required for GitHub to recognize your contributions."
+    exit 1
+fi
+
+sed_inplace "s|^GIT_USER_NAME=.*|GIT_USER_NAME=\"${INPUT_GIT_NAME}\"|" config.sh
+sed_inplace "s|^GIT_USER_EMAIL=.*|GIT_USER_EMAIL=\"${INPUT_GIT_EMAIL}\"|" config.sh
+ok "Set git identity: ${INPUT_GIT_NAME} <${INPUT_GIT_EMAIL}>"
+
 # ── Contribution repo (separate from autocommit-pro) ─────────
 if [[ ! -d "$REPO_DIR/.git" ]]; then
     mkdir -p "$REPO_DIR"
     git init --quiet "$REPO_DIR"
+    git -C "$REPO_DIR" config user.name "$INPUT_GIT_NAME"
+    git -C "$REPO_DIR" config user.email "$INPUT_GIT_EMAIL"
     echo "# autocommit-pro — contribution log" > "$REPO_DIR/contributions.log"
     git -C "$REPO_DIR" add contributions.log
     git -C "$REPO_DIR" commit -m "init: autocommit-pro" --quiet

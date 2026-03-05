@@ -27,11 +27,12 @@ cd autocommit-pro
 El instalador se encarga de:
 
 1. Crear `config.sh` a partir del template
-2. Crear `repo/` con su propio repositorio git y `contributions.log`
-3. Preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
-4. Si la URL no incluye token, pregunta por un Personal Access Token (opcional)
-5. Hacer push inicial al remote
-6. Instalar el cron job
+2. Pedir tu **nombre y email de Git** (requerido para que GitHub reconozca tus contribuciones)
+3. Crear `repo/` con su propio repositorio git y `contributions.log`
+4. Preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
+5. Si la URL no incluye token, pregunta por un Personal Access Token (opcional)
+6. Hacer push inicial al remote
+7. Instalar el cron job
 
 ### Autenticacion con token
 
@@ -62,6 +63,17 @@ En macOS, cron necesita permisos de **Full Disk Access** para ejecutar scripts:
 ## Configuracion
 
 Edita `config.sh` para personalizar el comportamiento:
+
+### Identidad Git (requerido)
+
+```bash
+GIT_USER_NAME="Tu Nombre"
+GIT_USER_EMAIL="tu-email@users.noreply.github.com"
+```
+
+GitHub solo cuenta contribuciones cuando el email del commit esta vinculado a tu cuenta. El instalador pide estos datos automaticamente, pero puedes cambiarlos en `config.sh`.
+
+Para encontrar tu email de GitHub ve a [github.com/settings/emails](https://github.com/settings/emails). Tambien puedes usar tu direccion noreply: `username@users.noreply.github.com`.
 
 ### Rango de commits
 
@@ -165,6 +177,8 @@ Crea un archivo `.env` con tus variables:
 
 ```bash
 REMOTE_URL=https://x-access-token:ghp_XXX@github.com/user/repo.git
+GIT_USER_NAME=Tu Nombre
+GIT_USER_EMAIL=tu-email@users.noreply.github.com
 TZ=America/Mexico_City
 ```
 
@@ -181,6 +195,8 @@ docker build -t autocommit-pro .
 
 docker run -d --name autocommit \
   -e REMOTE_URL="https://x-access-token:ghp_XXX@github.com/user/repo.git" \
+  -e GIT_USER_NAME="Tu Nombre" \
+  -e GIT_USER_EMAIL="tu-email@users.noreply.github.com" \
   -e FREQUENCY=daily \
   -e MIN_COMMITS=1 \
   -e MAX_COMMITS=5 \
@@ -188,13 +204,15 @@ docker run -d --name autocommit \
   autocommit-pro
 ```
 
-La unica variable requerida es `REMOTE_URL` (con token embebido). El resto tiene valores por defecto.
+Las variables requeridas son `REMOTE_URL`, `GIT_USER_NAME` y `GIT_USER_EMAIL`. El resto tiene valores por defecto.
 
 ### Variables de entorno
 
 | Variable | Default | Descripcion |
 |---|---|---|
 | `REMOTE_URL` | (requerido) | URL con token: `https://x-access-token:TOKEN@github.com/user/repo.git` |
+| `GIT_USER_NAME` | (requerido) | Nombre para los commits |
+| `GIT_USER_EMAIL` | (requerido) | Email vinculado a tu cuenta de GitHub |
 | `MIN_COMMITS` | `1` | Minimo de commits por ejecucion |
 | `MAX_COMMITS` | `5` | Maximo de commits por ejecucion |
 | `FREQUENCY` | `daily` | `daily` / `weekly` / `every2days` / `random` |
@@ -249,6 +267,7 @@ autocommit-pro/                ← repo del tool (git pull para updates)
 1. `autocommit.sh` carga la configuracion de `config.sh`
 2. Evalua si debe ejecutar hoy segun la frecuencia configurada
 3. Calcula un numero aleatorio de commits dentro del rango definido
-4. Por cada commit, agrega una linea con timestamp a `repo/contributions.log`, la agrega al staging y hace commit
-5. Si hay un remote configurado, hace push automaticamente
-6. Todo queda registrado en `autocommit.log`
+4. Configura `user.name` y `user.email` en el repo local para que los commits se atribuyan correctamente
+5. Por cada commit, agrega una linea con timestamp a `repo/contributions.log`, la agrega al staging y hace commit
+6. Si hay un remote configurado, hace push automaticamente
+7. Todo queda registrado en `autocommit.log`

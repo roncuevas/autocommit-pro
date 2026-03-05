@@ -94,6 +94,8 @@ done
 
 # ── Push to remote (if configured) ───────────────────────────
 if [[ -n "${GIT_REMOTE:-}" ]]; then
+    # Pull remote changes first to avoid rejection
+    git pull --rebase "$GIT_REMOTE" "$GIT_BRANCH" --quiet 2>>"$LOG_FILE" || true
     if git push "$GIT_REMOTE" "$GIT_BRANCH" --quiet 2>>"$LOG_FILE"; then
         log "PUSH: Success to ${GIT_REMOTE}/${GIT_BRANCH}"
     else

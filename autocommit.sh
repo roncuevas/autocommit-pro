@@ -73,8 +73,16 @@ fi
 NUM_COMMITS=$(( RANDOM % (MAX_COMMITS - MIN_COMMITS + 1) + MIN_COMMITS ))
 log "START: Will create ${NUM_COMMITS} commit(s)."
 
+# ── Configure git identity ──────────────────────────────────
+if [[ -z "${GIT_USER_NAME:-}" || -z "${GIT_USER_EMAIL:-}" ]]; then
+    log "ERROR: GIT_USER_NAME and GIT_USER_EMAIL must be set in config.sh"
+    exit 1
+fi
+
 # ── Perform commits ──────────────────────────────────────────
 cd "$REPO_DIR"
+git config user.name "$GIT_USER_NAME"
+git config user.email "$GIT_USER_EMAIL"
 
 for (( i = 1; i <= NUM_COMMITS; i++ )); do
     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')

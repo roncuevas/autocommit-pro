@@ -24,6 +24,13 @@ if [[ "$REMOTE_URL" != https://* ]]; then
     exit 1
 fi
 
+if [[ -z "${GIT_USER_NAME:-}" || -z "${GIT_USER_EMAIL:-}" ]]; then
+    err "GIT_USER_NAME and GIT_USER_EMAIL are required."
+    err "The email must match one linked to your GitHub account."
+    err "Example: docker run -e GIT_USER_NAME='John Doe' -e GIT_USER_EMAIL='john@users.noreply.github.com' ..."
+    exit 1
+fi
+
 echo ""
 echo "=== autocommit-pro — Docker Setup ==="
 echo ""
@@ -38,16 +45,13 @@ WEEKLY_DAY=${WEEKLY_DAY:-1}
 RANDOM_CHANCE=${RANDOM_CHANCE:-50}
 CRON_HOUR=${CRON_HOUR:-9}
 CRON_MINUTE=${CRON_MINUTE:-30}
+GIT_USER_NAME="${GIT_USER_NAME}"
+GIT_USER_EMAIL="${GIT_USER_EMAIL}"
 GIT_REMOTE="origin"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 INSTALL_DIR="${SCRIPT_DIR}"
 EOF
 ok "Generated config.sh"
-
-# ── Configure git identity ───────────────────────────────────
-git config --global user.name "autocommit-pro"
-git config --global user.email "autocommit-pro@users.noreply.github.com"
-ok "Git identity configured."
 
 # ── Initialize repo/ ────────────────────────────────────────
 if [[ ! -d "$REPO_DIR/.git" ]]; then

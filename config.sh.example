@@ -27,6 +27,15 @@ RANDOM_CHANCE=50
 CRON_HOUR=9
 CRON_MINUTE=30
 
+# ── Git Identity ─────────────────────────────────────────────
+# REQUIRED for GitHub to count your contributions.
+# The email MUST match one linked to your GitHub account.
+# Find your GitHub email at: https://github.com/settings/emails
+# (You can also use your GitHub noreply address:
+#  username@users.noreply.github.com)
+GIT_USER_NAME=""
+GIT_USER_EMAIL=""
+
 # ── Git Remote ────────────────────────────────────────────────
 # Leave empty to skip push after commits
 GIT_REMOTE=""

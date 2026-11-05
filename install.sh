@@ -65,6 +65,11 @@ ask_or_keep "Min commits per run" "$MIN_COMMITS" INPUT_MIN_COMMITS
 ask_or_keep "Max commits per run" "$MAX_COMMITS" INPUT_MAX_COMMITS
 ask_or_keep "Frequency (daily/weekly/every2days/random)" "$FREQUENCY" INPUT_FREQUENCY
 ask_or_keep "Destination (separate/self)" "$DESTINATION_MODE" INPUT_DESTINATION_MODE
+BRANCH_DEFAULT="$GIT_BRANCH"
+if [[ "$INPUT_DESTINATION_MODE" == "self" && ( "$BRANCH_DEFAULT" == "main" || "$BRANCH_DEFAULT" == "master" ) ]]; then
+    BRANCH_DEFAULT="autocommit-pro"
+fi
+ask_or_keep "Branch for commits" "$BRANCH_DEFAULT" INPUT_GIT_BRANCH
 AUTH_DEFAULT="${GIT_AUTH_METHOD:-}"
 if [[ -z "$AUTH_DEFAULT" ]]; then
     if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
@@ -99,7 +104,7 @@ RANDOM_CHANCE="$INPUT_RANDOM_CHANCE"
 CRON_HOUR="$INPUT_CRON_HOUR"
 CRON_MINUTE="$INPUT_CRON_MINUTE"
 GIT_REMOTE="${GIT_REMOTE:-}"
-GIT_BRANCH="${GIT_BRANCH:-main}"
+GIT_BRANCH="$INPUT_GIT_BRANCH"
 if [[ "$DESTINATION_MODE" == "self" ]]; then GIT_REMOTE=origin; fi
 if ! validate_config installer; then exit 1; fi
 
@@ -109,16 +114,10 @@ if [[ "$DESTINATION_MODE" == "self" ]]; then
         err "The self destination requires a checkout of your GitHub fork."
         exit 1
     fi
-    CURRENT_BRANCH=$(git -C "$SCRIPT_DIR" branch --show-current)
-    if [[ -z "$CURRENT_BRANCH" ]]; then
-        err "The self destination requires a checked-out branch."
-        exit 1
-    fi
     if ! CURRENT_REMOTE=$(git -C "$SCRIPT_DIR" remote get-url origin 2>/dev/null); then
         err "The self destination requires an 'origin' remote pointing to your fork."
         exit 1
     fi
-    GIT_BRANCH="$CURRENT_BRANCH"
     GIT_REMOTE=origin
     REMOTE_URL="$CURRENT_REMOTE"
 else
@@ -136,18 +135,6 @@ else
         GIT_REMOTE=""
     fi
     GIT_BRANCH="${GIT_BRANCH:-main}"
-fi
-
-if [[ "$DESTINATION_MODE" == "separate" ]]; then
-    if [[ -d "$REPO_DIR/.git" ]]; then
-        REPO_BRANCH=$(git -C "$REPO_DIR" branch --show-current)
-    else
-        REPO_BRANCH="$GIT_BRANCH"
-    fi
-    if [[ -n "$GIT_REMOTE" && "$REPO_BRANCH" != "$GIT_BRANCH" ]]; then
-        err "repo/ is on branch '$REPO_BRANCH', but GIT_BRANCH is '$GIT_BRANCH'. Reconcile the branch before installing."
-        exit 1
-    fi
 fi
 
 if ! validate_config installer; then exit 1; fi
@@ -200,6 +187,24 @@ if [[ "$DESTINATION_MODE" == "self" && "$REMOTE_URL" != "$CURRENT_REMOTE" ]]; th
     git -C "$SCRIPT_DIR" remote set-url origin "$REMOTE_URL"
 fi
 
+if [[ "$DESTINATION_MODE" == "separate" && -d "$REPO_DIR/.git" && -n "$REMOTE_URL" ]]; then
+    if git -C "$REPO_DIR" remote get-url origin >/dev/null 2>&1; then
+        git -C "$REPO_DIR" remote set-url origin "$REMOTE_URL"
+    else
+        git -C "$REPO_DIR" remote add origin "$REMOTE_URL"
+    fi
+fi
+BRANCH_REPO="$SCRIPT_DIR"
+if [[ "$DESTINATION_MODE" == "separate" ]]; then BRANCH_REPO="$REPO_DIR"; fi
+if [[ -d "$BRANCH_REPO/.git" ]]; then
+    BRANCH_REMOTE=""
+    if [[ "$DESTINATION_MODE" == "self" || -n "$REMOTE_URL" ]]; then BRANCH_REMOTE="$GIT_REMOTE"; fi
+    if ! prepare_destination_branch "$BRANCH_REPO" "$BRANCH_REMOTE" "$GIT_BRANCH"; then
+        err "Could not prepare destination branch '$GIT_BRANCH'. Resolve the branch or worktree issue and retry."
+        exit 1
+    fi
+fi
+
 # Save a complete valid configuration atomically. printf %q keeps entered values shell-safe.
 CURRENT_PHASE="configuration save"
 INSTALL_DIR="$SCRIPT_DIR"
@@ -239,6 +244,11 @@ if [[ "$DESTINATION_MODE" == "separate" ]]; then
 else
     git -C "$SCRIPT_DIR" config user.name "$GIT_USER_NAME"
     git -C "$SCRIPT_DIR" config user.email "$GIT_USER_EMAIL"
+    if ! git -C "$SCRIPT_DIR" push -u origin "HEAD:refs/heads/${GIT_BRANCH}" --quiet >/dev/null 2>&1; then
+        err "Could not publish branch '$GIT_BRANCH'. Local commits were kept; fix the remote and rerun install.sh."
+        exit 1
+    fi
+    ok "Self destination branch '$GIT_BRANCH' is published."
 fi
 
 # Install cron only after configuration and repository setup succeed.

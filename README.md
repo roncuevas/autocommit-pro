@@ -27,7 +27,7 @@ cd autocommit-pro
 ./install.sh
 ```
 
-El instalador valida todos los valores antes de guardar la configuración o cambiar cron. Si `gh` ya está instalado y autenticado, propone usarlo; también puedes elegir autenticación por URL/token. Se encarga de:
+El instalador valida todos los valores antes de guardar la configuración o cambiar cron. También permite elegir la rama de destino. En modo `self` propone `autocommit-pro` para mantener los commits automáticos fuera de `main`; puedes elegir otra rama, pero `main` y `master` no se permiten para ese modo. Si `gh` ya está instalado y autenticado, propone usarlo; también puedes elegir autenticación por URL/token. Se encarga de:
 
 1. Crear `config.sh` a partir del template
 2. Pedir tu **nombre y email de Git** (requerido para que GitHub reconozca tus contribuciones)
@@ -73,7 +73,7 @@ El destino remoto de una instalación nueva debe estar vacío o compartir histor
 
 ### Usar tu fork como destino
 
-Al ejecutar `./install.sh`, elige `self` en **Destination**. Esta opción requiere que hayas clonado tu fork y que el remote `origin` apunte a él. Cada ejecución agrega una entrada con fecha a `CHANGELOG.md`, crea entre `MIN_COMMITS` y `MAX_COMMITS` commits y los publica en la rama actual. El script sincroniza esa rama antes de escribir y se detiene si hay cambios locales, para no incluirlos en commits automáticos.
+Al ejecutar `./install.sh`, elige `self` en **Destination** y luego la rama donde quieres publicar. Esta opción requiere que hayas clonado tu fork y que el remote `origin` apunte a él. Por defecto crea o usa `autocommit-pro`, separada de `main`; también puedes seleccionar otra rama distinta de `main` o `master`. Si la rama ya existe en el remoto, se sincroniza; si no, se crea desde el checkout actual y se publica sin modificar `main`. Cada ejecución agrega una entrada con fecha a `CHANGELOG.md` y crea entre `MIN_COMMITS` y `MAX_COMMITS` commits en esa rama. El script sincroniza la rama antes de escribir y se detiene si hay cambios locales, para no incluirlos en commits automáticos.
 
 Si falla la sincronización, no se crean commits nuevos. Si falla el push, los commits ya creados quedan locales; el proceso devuelve error y vuelve a intentar publicarlos en una ejecución posterior. Si el checkout tiene cambios pendientes, commitea o guarda esos cambios antes de reintentar. Si la ejecución anterior fue terminada a la fuerza, revisa y elimina el directorio de lock indicado en `autocommit.log` antes de volver a ejecutar.
 
@@ -146,10 +146,10 @@ Para aplicar cambios de horario, ejecuta `./install.sh` de nuevo.
 DESTINATION_MODE="separate" # "separate" usa repo/; "self" usa este fork
 GIT_AUTH_METHOD="gh"     # "gh" usa GitHub CLI; "token" usa URL/token o credenciales Git
 GIT_REMOTE=""      # Nombre del remote (ej: "origin"). Vacio = sin push
-GIT_BRANCH="main"  # Branch para push
+GIT_BRANCH=""       # Vacío: main en separate, autocommit-pro en self
 ```
 
-En modo `self`, el instalador configura `GIT_REMOTE="origin"` y la rama actual. Ejecuta `./install.sh` para cambiar el destino.
+El instalador permite elegir `GIT_BRANCH`. En modo `self`, el valor vacío selecciona `autocommit-pro` y `main`/`master` se rechazan. Ejecuta `./install.sh` para cambiar el destino o la rama.
 
 Para cambiar `GIT_AUTH_METHOD` en una instalación local, vuelve a ejecutar `./install.sh`; así se comprueba la sesión `gh` y se configura el credential helper además de actualizar `config.sh`.
 
@@ -281,7 +281,7 @@ Las variables requeridas son `REMOTE_URL`, `GIT_USER_NAME` y `GIT_USER_EMAIL`. E
 | `RANDOM_CHANCE` | `50` | Probabilidad (1-100) para modo random |
 | `CRON_HOUR` | `9` | Hora del cron (formato 24h) |
 | `CRON_MINUTE` | `30` | Minuto del cron |
-| `GIT_BRANCH` | `main` | Branch para push |
+| `GIT_BRANCH` | `main` (`autocommit-pro` en `self`) | Rama para los commits y el push; se puede elegir durante la instalación o definir en Docker |
 | `TZ` | `UTC` | Zona horaria (ej: `America/Mexico_City`) |
 
 ### Comandos utiles

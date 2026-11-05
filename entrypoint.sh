@@ -29,7 +29,8 @@ CRON_MINUTE="${CRON_MINUTE:-30}"
 GIT_USER_NAME="${GIT_USER_NAME:-}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-}"
 GIT_REMOTE=origin
-GIT_BRANCH="${GIT_BRANCH:-main}"
+GIT_BRANCH="${GIT_BRANCH:-}"
+set_defaults
 
 if [[ -z "${REMOTE_URL:-}" || "$REMOTE_URL" != https://* ]]; then
     err "REMOTE_URL is required and must start with https://."
@@ -78,7 +79,7 @@ if [[ "$DESTINATION_MODE" == "self" ]]; then
         fi
         mkdir -p "$APP_DIR"
         CLONE_ERROR="${DATA_DIR}/clone-error.log"
-        if ! git clone --quiet --branch "$GIT_BRANCH" "$REMOTE_URL" "$APP_DIR" 2> "$CLONE_ERROR"; then
+        if ! git clone --quiet "$REMOTE_URL" "$APP_DIR" 2> "$CLONE_ERROR"; then
             rm -rf "$APP_DIR"
             rm -f "$CLONE_ERROR"
             err "Could not clone the self destination. Check REMOTE_URL, branch, credentials, and the persistent volume."
@@ -93,11 +94,6 @@ if [[ "$DESTINATION_MODE" == "self" ]]; then
         err "Persistent self destination is not a valid Git checkout."
         exit 1
     fi
-    CURRENT_BRANCH=$(git -C "$REPO_DIR" branch --show-current)
-    if [[ "$CURRENT_BRANCH" != "$GIT_BRANCH" ]]; then
-        err "Persistent checkout is on '$CURRENT_BRANCH', expected '$GIT_BRANCH'."
-        exit 1
-    fi
     git -C "$REPO_DIR" remote set-url origin "$REMOTE_URL"
 else
     CURRENT_PHASE="separate destination bootstrap"
@@ -110,16 +106,17 @@ else
         git -C "$REPO_DIR" add contributions.log
         git -C "$REPO_DIR" -c user.name="$GIT_USER_NAME" -c user.email="$GIT_USER_EMAIL" commit -m "init: autocommit-pro" --quiet
     fi
-    CURRENT_BRANCH=$(git -C "$REPO_DIR" branch --show-current)
-    if [[ "$CURRENT_BRANCH" != "$GIT_BRANCH" ]]; then
-        err "Persistent repo/ is on '$CURRENT_BRANCH', expected '$GIT_BRANCH'."
-        exit 1
-    fi
     if git -C "$REPO_DIR" remote get-url origin >/dev/null 2>&1; then
         git -C "$REPO_DIR" remote set-url origin "$REMOTE_URL"
     else
         git -C "$REPO_DIR" remote add origin "$REMOTE_URL"
     fi
+fi
+
+CURRENT_PHASE="destination branch setup"
+if ! prepare_destination_branch "$REPO_DIR" origin "$GIT_BRANCH"; then
+    err "Could not prepare destination branch '$GIT_BRANCH'; inspect local changes and remote branch state."
+    exit 1
 fi
 
 GIT_REMOTE=origin
@@ -135,6 +132,12 @@ CURRENT_PHASE="initial push"
 if [[ "$DESTINATION_MODE" == "separate" ]] && ! git -C "$REPO_DIR" rev-parse --verify "refs/remotes/origin/${GIT_BRANCH}" >/dev/null 2>&1; then
     if ! git -C "$REPO_DIR" push -u origin "HEAD:refs/heads/${GIT_BRANCH}" --quiet >/dev/null 2>&1; then
         err "Initial push failed. The persistent local commits were kept; correct the remote and restart."
+        exit 1
+    fi
+fi
+if [[ "$DESTINATION_MODE" == "self" ]]; then
+    if ! git -C "$REPO_DIR" push -u origin "HEAD:refs/heads/${GIT_BRANCH}" --quiet >/dev/null 2>&1; then
+        err "Could not publish branch '$GIT_BRANCH'. Local commits were kept; correct the remote and restart."
         exit 1
     fi
 fi

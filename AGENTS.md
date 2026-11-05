@@ -10,12 +10,13 @@
 - `install.sh` validates all answers before changing config or cron. Cron is updated only after repository setup succeeds.
 - `autocommit.sh` validates configuration and repository state, synchronizes before creating commits, and preserves local commits if a push fails.
 - `entrypoint.sh` initializes the Docker destination, persistent runtime config, logs, and cron.
-- `DESTINATION_MODE=separate` writes to the independent `repo/` checkout. `self` writes to `CHANGELOG.md` in the user's fork.
+- `DESTINATION_MODE=separate` writes to the independent `repo/` checkout. `self` writes to `CHANGELOG.md` in the user's fork on a separately selected branch; its default is `autocommit-pro` and `main`/`master` are forbidden.
 
 ## Safety invariants
 
 - Never force-push or discard local commits and worktree changes automatically.
 - Refuse to run against a dirty destination worktree.
+- Prepare the configured branch without overwriting local changes. In self mode, publish only the selected branch and keep `main` unchanged.
 - Never include raw Git stderr or shell commands in logs when they could expose remote credentials. Keep failure messages actionable and redact secrets.
 - Write runtime configuration through a temporary file and atomic rename; serialize shell values with `printf %q`.
 - Keep Docker destinations and logs in persistent volumes.

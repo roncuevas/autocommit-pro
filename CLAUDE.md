@@ -17,7 +17,7 @@ The shell scripts and one shared helper form the system:
 - **`uninstall.sh`** — Removes cron entries matching `# autocommit-pro`. Does not delete files.
 - **`config.sh.example`** — Template sourced as bash. Users copy to `config.sh` (gitignored); `common.sh` validates it at install and runtime.
 
-**Key architectural decision:** `DESTINATION_MODE=separate` uses the independent, gitignored `repo/`; `self` writes only to `CHANGELOG.md` in the fork checkout. Both destinations refuse dirty worktrees and never force-push. Docker destinations live in persistent volumes.
+**Key architectural decision:** `DESTINATION_MODE=separate` uses the independent, gitignored `repo/`; `self` writes only to `CHANGELOG.md` in the fork checkout and uses a selected branch separate from `main` (default `autocommit-pro`). Both destinations refuse dirty worktrees and never force-push. Docker destinations live in persistent volumes.
 
 **Git auth:** `GIT_AUTH_METHOD=gh` uses `gh auth login` and the official `gh auth setup-git` credential helper for HTTPS GitHub remotes; Docker requires `GH_TOKEN` or `GITHUB_TOKEN`. `token` retains URL-token or existing Git credential behavior. Never log raw Git stderr from credentialed remotes.
 
@@ -48,3 +48,4 @@ git pull               # Update tool without affecting repo/
 - `config.sh` is gitignored; `config.sh.example` is tracked.
 - `repo/` is gitignored; it has its own `.git` independent from the tool repo.
 - `bash tests/run.sh` exercises local bare remotes, installer validation, retry behavior, and Docker bootstrap using command stubs.
+- The installer prompts for `GIT_BRANCH`; self mode must not target `main` or `master`. Docker accepts the same setting via environment.

@@ -38,7 +38,10 @@ set_defaults() {
     : "${CRON_HOUR:=9}"
     : "${CRON_MINUTE:=30}"
     : "${GIT_REMOTE:=}"
-    : "${GIT_BRANCH:=main}"
+    : "${GIT_BRANCH:=}"
+    if [[ -z "$GIT_BRANCH" ]]; then
+        if [[ "$DESTINATION_MODE" == "self" ]]; then GIT_BRANCH="autocommit-pro"; else GIT_BRANCH="main"; fi
+    fi
 }
 
 normalize_uint() {
@@ -87,9 +90,50 @@ validate_config() {
     if [[ "$DESTINATION_MODE" == "self" || -n "$GIT_REMOTE" ]]; then
         [[ -n "$GIT_REMOTE" && -n "$GIT_BRANCH" ]] || { echo "GIT_REMOTE and GIT_BRANCH are required for a publishing destination." >&2; return 1; }
     fi
+    if [[ "$DESTINATION_MODE" == "self" && ( "$GIT_BRANCH" == "main" || "$GIT_BRANCH" == "master" ) ]]; then
+        echo "Self destination must use a branch separate from main/master (default: autocommit-pro)." >&2
+        return 1
+    fi
     if [[ -n "$GIT_REMOTE" && ! "$GIT_REMOTE" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
         echo "GIT_REMOTE must be a simple configured Git remote name." >&2
         return 1
+    fi
+}
+
+prepare_destination_branch() {
+    local repo="$1" remote="$2" branch="$3"
+    if ! git -C "$repo" diff --quiet --ignore-submodules HEAD -- || ! git -C "$repo" diff --cached --quiet --ignore-submodules; then
+        echo "Destination has tracked local changes; commit or stash them before changing branches." >&2
+        return 1
+    fi
+    if [[ -n "$remote" ]]; then
+        if ! git -C "$repo" fetch --prune "$remote" >/dev/null 2>&1; then
+            echo "Could not fetch remote '$remote' while preparing branch '$branch'." >&2
+            return 1
+        fi
+    fi
+    if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch"; then
+        if ! git -C "$repo" checkout "$branch" >/dev/null 2>&1; then
+            echo "Could not switch to local branch '$branch'." >&2
+            return 1
+        fi
+    elif [[ -n "$remote" ]] && git -C "$repo" show-ref --verify --quiet "refs/remotes/$remote/$branch"; then
+        if ! git -C "$repo" checkout --track -b "$branch" "$remote/$branch" >/dev/null 2>&1; then
+            echo "Could not check out remote branch '$remote/$branch'." >&2
+            return 1
+        fi
+    else
+        if ! git -C "$repo" checkout -b "$branch" >/dev/null 2>&1; then
+            echo "Could not create branch '$branch'." >&2
+            return 1
+        fi
+    fi
+    if [[ -n "$remote" ]] && git -C "$repo" show-ref --verify --quiet "refs/remotes/$remote/$branch"; then
+        if ! git -C "$repo" pull --rebase "$remote" "$branch" >/dev/null 2>&1; then
+            git -C "$repo" rebase --abort >/dev/null 2>&1 || true
+            echo "Could not synchronize branch '$branch' with remote '$remote'." >&2
+            return 1
+        fi
     fi
 }
 

@@ -35,6 +35,12 @@ if (DESTINATION_MODE=separate MIN_COMMITS=1 MAX_COMMITS=2 FREQUENCY=daily GIT_US
 fi
 pass "rejects incomplete publishing and multiline identity settings"
 
+if (DESTINATION_MODE=self MIN_COMMITS=1 MAX_COMMITS=1 FREQUENCY=daily GIT_USER_NAME=Tester GIT_USER_EMAIL=test@example.invalid GIT_REMOTE=origin GIT_BRANCH=main GIT_AUTH_METHOD=token; set_defaults; validate_config runtime >/dev/null 2>&1); then
+    fail "self destination accepted main"
+fi
+(DESTINATION_MODE=self GIT_BRANCH=''; set_defaults; [[ "$GIT_BRANCH" == autocommit-pro ]]) || fail "self branch default is not isolated"
+pass "requires and defaults self mode to a branch separate from main"
+
 CONFIG="$TMP_ROOT/config.sh"
 printf '# custom\nCUSTOM_SETTING=kept\nMIN_COMMITS=999\n' > "$CONFIG"
 INSTALL_DIR="$TMP_ROOT"

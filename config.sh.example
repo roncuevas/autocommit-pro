@@ -41,7 +41,8 @@ GIT_USER_EMAIL=""
 DESTINATION_MODE="separate"
 # Required for self; optional for separate (empty means local commits only).
 GIT_REMOTE=""
-GIT_BRANCH="main"
+# Empty selects "main" for separate or "autocommit-pro" for self.
+GIT_BRANCH=""
 # "gh" uses GitHub CLI credentials; "token" uses the URL token prompt or Git credentials.
 GIT_AUTH_METHOD=""
 

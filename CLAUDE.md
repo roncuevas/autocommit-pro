@@ -4,20 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-autocommit-pro is a bash-only tool that automates GitHub contribution graph commits via cron. No external dependencies beyond bash 3.2+, git, and cron. Must work on both macOS and Linux.
+autocommit-pro is a Bash tool that automates GitHub contribution graph commits via cron. It supports Bash 3.2+, Git, cron, and standard Unix utilities on macOS and Linux.
 
 ## Architecture
 
-Four scripts form the entire system:
+The shell scripts and one shared helper form the system:
 
-- **`autocommit.sh`** — Main script executed by cron. Loads `config.sh`, evaluates a frequency gate (`should_run_today`), generates N random commits by appending to `repo/contributions.log`, and optionally pushes to a remote.
-- **`install.sh`** — Interactive installer. Copies `config.sh.example` → `config.sh`, creates `repo/` as a separate git repo for contributions, configures remote with optional token auth, does initial force push, and sets up cron with `# autocommit-pro` marker.
+- **`autocommit.sh`** — Main script executed by cron. Loads and validates `config.sh`, takes an atomic per-destination lock, synchronizes before creating commits, and reports failed pushes without discarding local commits. `separate` appends to `repo/contributions.log`; `self` appends to `CHANGELOG.md` in the fork.
+- **`common.sh`** — Shared defaults, validation, safe atomic config writing, and portable directory locking for Bash 3.2+.
+- **`install.sh`** — Interactive installer. Validates before writing config, creates the separate destination without force-pushing, and updates cron only after setup succeeds.
+- **`entrypoint.sh`** — Docker setup. Persists `separate` in `/app/repo` and clones `self` into the `/data` volume.
 - **`uninstall.sh`** — Removes cron entries matching `# autocommit-pro`. Does not delete files.
-- **`config.sh.example`** — Template sourced as bash. Users copy to `config.sh` (gitignored).
+- **`config.sh.example`** — Template sourced as bash. Users copy to `config.sh` (gitignored); `common.sh` validates it at install and runtime.
 
-**Key architectural decision:** `repo/` is a separate git repository from autocommit-pro itself. This allows the user to `git pull` tool updates without mixing history with contribution commits. `repo/` is gitignored. The install.sh ensures `repo/` branch is named `main` via `git branch -M main`.
+**Key architectural decision:** `DESTINATION_MODE=separate` uses the independent, gitignored `repo/`; `self` writes only to `CHANGELOG.md` in the fork checkout. Both destinations refuse dirty worktrees and never force-push. Docker destinations live in persistent volumes.
 
-**Token auth:** install.sh accepts either a full URL with embedded token (`https://x-access-token:TOKEN@github.com/...`) or a plain `https://github.com/...` URL followed by a separate token prompt. URLs must start with `https://`.
+**Git auth:** `GIT_AUTH_METHOD=gh` uses `gh auth login` and the official `gh auth setup-git` credential helper for HTTPS GitHub remotes; Docker requires `GH_TOKEN` or `GITHUB_TOKEN`. `token` retains URL-token or existing Git credential behavior. Never log raw Git stderr from credentialed remotes.
 
 ## Key Commands
 
@@ -31,7 +33,7 @@ git pull               # Update tool without affecting repo/
 
 ## Cross-Platform Considerations
 
-- **`sed -i`** differs: macOS requires `sed -i ''`, Linux uses `sed -i`. Use `uname -s` detection (see `sed_inplace` in `install.sh`).
+- Config writing uses a temporary file and atomic rename; use `printf %q` for shell-safe serialized values.
 - **`autocommit.sh` exports PATH** with `/usr/local/bin:/opt/homebrew/bin` so git is found when running from cron on macOS.
 - Shebangs use `#!/usr/bin/env bash`. Only bash 3.2+ features (macOS default).
 - Scripts are committed with executable permissions (`100755`). Do not add `chmod +x` in install.sh — it causes unstaged changes that block `git pull`.
@@ -45,3 +47,4 @@ git pull               # Update tool without affecting repo/
 - Cron entries are tagged with `# autocommit-pro` for reliable add/remove.
 - `config.sh` is gitignored; `config.sh.example` is tracked.
 - `repo/` is gitignored; it has its own `.git` independent from the tool repo.
+- `bash tests/run.sh` exercises local bare remotes, installer validation, retry behavior, and Docker bootstrap using command stubs.

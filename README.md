@@ -9,6 +9,7 @@ Script bash que automatiza commits diarios para llenar tu grafico de contribucio
 - bash 3.2+
 - git
 - cron (`crontab`)
+- standard Unix tools (`awk`, `cksum`, `mktemp`)
 
 Compatible con **macOS** y **Linux**.
 
@@ -18,23 +19,39 @@ Compatible con **macOS** y **Linux**.
 
 ## Instalacion local
 
+> **Importante: primero crea un fork de este repositorio en tu cuenta de GitHub y clona tu fork.** El modo `self` publica commits en ese repositorio; no configures el repositorio original como destino.
+
 ```bash
-git clone https://github.com/roncuevas/autocommit-pro.git
+git clone https://github.com/TU-USUARIO/autocommit-pro.git
 cd autocommit-pro
 ./install.sh
 ```
 
-El instalador se encarga de:
+El instalador valida todos los valores antes de guardar la configuración o cambiar cron. Si `gh` ya está instalado y autenticado, propone usarlo; también puedes elegir autenticación por URL/token. Se encarga de:
 
 1. Crear `config.sh` a partir del template
 2. Pedir tu **nombre y email de Git** (requerido para que GitHub reconozca tus contribuciones)
-3. Crear `repo/` con su propio repositorio git y `contributions.log`
-4. Preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
-5. Si la URL no incluye token, pregunta por un Personal Access Token (opcional)
-6. Hacer push inicial al remote
-7. Instalar el cron job
+3. Elegir el destino: el repositorio separado `repo/` o el changelog de tu fork (`self`)
+4. Configurar autenticación con GitHub CLI o por URL/token
+5. Para el destino separado, preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
+6. Para el destino separado, hacer un push inicial sin forzar el historial remoto
+7. Instalar o reemplazar el cron job solo cuando la configuración y el repositorio estén listos
 
-### Autenticacion con token
+### Autenticación con GitHub CLI
+
+Elige `gh` durante la instalación. Si aún no hay una sesión activa, el instalador inicia `gh auth login`; después ejecuta `gh auth setup-git --force --hostname github.com` para que Git use el helper oficial de `gh`, incluso si la sesión viene de `GH_TOKEN`. El remote queda sin token incrustado.
+
+Puedes iniciar sesión antes de instalar con:
+
+```bash
+gh auth login
+```
+
+Consulta la documentación oficial de [`gh auth login`](https://cli.github.com/manual/gh_auth_login) y [`gh auth setup-git`](https://cli.github.com/manual/gh_auth_setup-git). El instalador también admite autenticación por URL/token o credenciales Git existentes. Para habilitar `gh`, instala GitHub CLI siguiendo la [guía oficial](https://github.com/cli/cli/blob/trunk/docs/install_linux.md) y vuelve a ejecutar `./install.sh`. `gh auth setup-git` modifica la configuración global de Git para usar `gh` como helper de credenciales.
+
+`gh` guarda la sesión en el almacén seguro del sistema cuando está disponible; si no encuentra uno, puede recurrir a un archivo de texto plano. Revisa `gh auth status` para confirmar el estado de la sesión y su almacenamiento.
+
+### Autenticación con token
 
 El instalador acepta dos formas de autenticacion:
 
@@ -51,6 +68,16 @@ El instalador acepta dos formas de autenticacion:
 - Hacer `git pull` en autocommit-pro para recibir actualizaciones del tool
 - Mantener el historial de contribuciones separado del historial de desarrollo
 - Apuntar `repo/` a cualquier repo de GitHub sin mezclar historiales
+
+El destino remoto de una instalación nueva debe estar vacío o compartir historial con `repo/`. El instalador no fuerza el push; si Git rechaza el historial, conserva los commits locales y no instala cron.
+
+### Usar tu fork como destino
+
+Al ejecutar `./install.sh`, elige `self` en **Destination**. Esta opción requiere que hayas clonado tu fork y que el remote `origin` apunte a él. Cada ejecución agrega una entrada con fecha a `CHANGELOG.md`, crea entre `MIN_COMMITS` y `MAX_COMMITS` commits y los publica en la rama actual. El script sincroniza esa rama antes de escribir y se detiene si hay cambios locales, para no incluirlos en commits automáticos.
+
+Si falla la sincronización, no se crean commits nuevos. Si falla el push, los commits ya creados quedan locales; el proceso devuelve error y vuelve a intentar publicarlos en una ejecución posterior. Si el checkout tiene cambios pendientes, commitea o guarda esos cambios antes de reintentar. Si la ejecución anterior fue terminada a la fuerza, revisa y elimina el directorio de lock indicado en `autocommit.log` antes de volver a ejecutar.
+
+El destino predeterminado sigue siendo `separate`, que utiliza `repo/` como antes.
 
 ### macOS: Full Disk Access
 
@@ -116,9 +143,17 @@ Para aplicar cambios de horario, ejecuta `./install.sh` de nuevo.
 ### Git remote
 
 ```bash
+DESTINATION_MODE="separate" # "separate" usa repo/; "self" usa este fork
+GIT_AUTH_METHOD="gh"     # "gh" usa GitHub CLI; "token" usa URL/token o credenciales Git
 GIT_REMOTE=""      # Nombre del remote (ej: "origin"). Vacio = sin push
 GIT_BRANCH="main"  # Branch para push
 ```
+
+En modo `self`, el instalador configura `GIT_REMOTE="origin"` y la rama actual. Ejecuta `./install.sh` para cambiar el destino.
+
+Para cambiar `GIT_AUTH_METHOD` en una instalación local, vuelve a ejecutar `./install.sh`; así se comprueba la sesión `gh` y se configura el credential helper además de actualizar `config.sh`.
+
+El script también valida el rango de commits, la frecuencia, los parámetros semanales/aleatorios y los valores del cron. Corrige cualquier valor inválido en `config.sh` y vuelve a ejecutar el instalador.
 
 ### Directorio de instalacion
 
@@ -154,6 +189,8 @@ Los eventos se registran en `autocommit.log`:
 cat autocommit.log
 ```
 
+El instalador y las ejecuciones locales escriben eventos con fecha, nivel y fase. Docker conserva el mismo registro en el volumen `autocommit-logs` (`/logs/autocommit.log`) y también muestra los eventos en `docker compose logs autocommit`.
+
 ### Actualizar autocommit-pro
 
 ```bash
@@ -169,14 +206,18 @@ Ideal para desplegar en un VPS o cualquier servidor con Docker.
 ### Docker Compose (recomendado)
 
 ```bash
-git clone https://github.com/roncuevas/autocommit-pro.git
+git clone https://github.com/TU-USUARIO/autocommit-pro.git
 cd autocommit-pro
 ```
+
+Usa `DESTINATION_MODE=separate` para publicar en un repositorio independiente vacío, o `DESTINATION_MODE=self` y la URL de tu fork para clonarlo y actualizarlo. Docker guarda ambos destinos en volúmenes persistentes; los commits locales pendientes no se pierden al reemplazar el contenedor.
 
 Crea un archivo `.env` con tus variables:
 
 ```bash
 REMOTE_URL=https://x-access-token:ghp_XXX@github.com/user/repo.git
+DESTINATION_MODE=separate
+GIT_AUTH_METHOD=token
 GIT_USER_NAME=Tu Nombre
 GIT_USER_EMAIL=tu-email@users.noreply.github.com
 TZ=America/Mexico_City
@@ -188,6 +229,19 @@ Y levanta el contenedor:
 docker compose up -d
 ```
 
+En Docker puedes usar GitHub CLI en modo no interactivo con un token expuesto al proceso del contenedor. No lo agregues al archivo `.env` ni al comando como texto literal:
+
+```bash
+export GH_TOKEN="tu-token"
+GIT_AUTH_METHOD=gh docker compose up -d
+```
+
+También se acepta `GITHUB_TOKEN`. La imagen instala `gh`, configura su helper Git al iniciar y elimina cualquier credencial del URL antes de clonar. Usa un token vigente con acceso de escritura al repositorio seleccionado; GitHub CLI no puede renovar automáticamente los tokens recibidos por estas variables. El token queda en el entorno del contenedor, accesible a quien tenga permisos sobre Docker. Para modo `self`, `REMOTE_URL` debe ser el URL HTTPS de tu fork.
+
+### Pruebas
+
+Ejecuta `bash tests/run.sh` para correr las pruebas unitarias de validación/configuración/logs y las pruebas de integración con remotos Git locales temporales. No se conectan a GitHub.
+
 ### Docker run
 
 ```bash
@@ -195,22 +249,29 @@ docker build -t autocommit-pro .
 
 docker run -d --name autocommit \
   -e REMOTE_URL="https://x-access-token:ghp_XXX@github.com/user/repo.git" \
+  -e DESTINATION_MODE=separate \
+  -e GIT_AUTH_METHOD=token \
   -e GIT_USER_NAME="Tu Nombre" \
   -e GIT_USER_EMAIL="tu-email@users.noreply.github.com" \
   -e FREQUENCY=daily \
   -e MIN_COMMITS=1 \
   -e MAX_COMMITS=5 \
   -e TZ=America/Mexico_City \
+  -v autocommit-repo:/app/repo \
+  -v autocommit-self:/data \
   autocommit-pro
 ```
 
-Las variables requeridas son `REMOTE_URL`, `GIT_USER_NAME` y `GIT_USER_EMAIL`. El resto tiene valores por defecto.
+Las variables requeridas son `REMOTE_URL`, `GIT_USER_NAME` y `GIT_USER_EMAIL`. El resto tiene valores por defecto. Monta los volúmenes indicados también con `docker run` para conservar los commits locales.
 
 ### Variables de entorno
 
 | Variable | Default | Descripcion |
 |---|---|---|
+| `DESTINATION_MODE` | `separate` | `separate` usa `/app/repo`; `self` clona el fork en `/data/autocommit-pro` |
+| `GIT_AUTH_METHOD` | `token` | `gh` usa el helper de GitHub CLI; `token` usa `REMOTE_URL`/credenciales Git |
 | `REMOTE_URL` | (requerido) | URL con token: `https://x-access-token:TOKEN@github.com/user/repo.git` |
+| `GH_TOKEN` / `GITHUB_TOKEN` | (requerido en modo `gh`) | Token no interactivo para GitHub CLI en Docker |
 | `GIT_USER_NAME` | (requerido) | Nombre para los commits |
 | `GIT_USER_EMAIL` | (requerido) | Email vinculado a tu cuenta de GitHub |
 | `MIN_COMMITS` | `1` | Minimo de commits por ejecucion |
@@ -231,6 +292,8 @@ docker compose down              # Detener y eliminar contenedor
 docker compose up -d --build     # Rebuild y reiniciar
 ```
 
+Los pushes fallidos se reportan como errores y dejan los commits en el volumen para el siguiente reintento. No se usan pushes forzados.
+
 ## Desinstalacion
 
 ```bash
@@ -248,6 +311,7 @@ rm -rf autocommit-pro
 ```
 autocommit-pro/                ← repo del tool (git pull para updates)
 ├── autocommit.sh              # Script principal
+├── common.sh                  # Validación, config segura y lock
 ├── config.sh.example          # Template de configuracion
 ├── config.sh                  # Tu configuracion (ignorado por git)
 ├── install.sh                 # Instalador
@@ -255,9 +319,13 @@ autocommit-pro/                ← repo del tool (git pull para updates)
 ├── Dockerfile                 # Imagen Docker
 ├── docker-compose.yml         # Docker Compose
 ├── entrypoint.sh              # Entrypoint del contenedor
+├── tests/run.sh               # Ejecuta pruebas unitarias e integración
+│   ├── unit.sh                # Validación, configuración y logs
+│   └── integration.sh         # Flujos con repositorios Git temporales
 ├── .dockerignore
 ├── .gitignore
 ├── autocommit.log             # Log de ejecuciones (ignorado por git)
+├── CHANGELOG.md               # Registro de commits en destino self
 └── repo/                      ← repo separado (origin = tu repo de contribuciones)
     └── contributions.log      # Archivo modificado en cada commit
 ```
@@ -268,6 +336,16 @@ autocommit-pro/                ← repo del tool (git pull para updates)
 2. Evalua si debe ejecutar hoy segun la frecuencia configurada
 3. Calcula un numero aleatorio de commits dentro del rango definido
 4. Configura `user.name` y `user.email` en el repo local para que los commits se atribuyan correctamente
-5. Por cada commit, agrega una linea con timestamp a `repo/contributions.log`, la agrega al staging y hace commit
+5. En modo `separate`, cada commit agrega una linea a `repo/contributions.log`; en modo `self`, agrega una entrada a `CHANGELOG.md` en el fork
 6. Si hay un remote configurado, hace push automaticamente
-7. Todo queda registrado en `autocommit.log`
+7. Todo queda registrado en `autocommit.log`; los errores hacen que la ejecución termine con código distinto de cero
+
+## Pruebas locales
+
+```bash
+bash tests/run.sh
+```
+
+Las pruebas usan repositorios Git temporales y no publican cambios en GitHub.
+
+Las pautas para contribuir y modificar los flujos están en [`AGENTS.md`](AGENTS.md); `CLAUDE.md` resume la arquitectura para Claude Code.

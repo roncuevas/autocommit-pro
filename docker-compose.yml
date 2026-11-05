@@ -2,7 +2,13 @@ services:
   autocommit:
     build: .
     environment:
-      - REMOTE_URL=${REMOTE_URL}
+      - DESTINATION_MODE=${DESTINATION_MODE:-separate}
+      - GIT_AUTH_METHOD=${GIT_AUTH_METHOD:-token}
+      - REMOTE_URL=${REMOTE_URL:-}
+      - GH_TOKEN=${GH_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GIT_USER_NAME=${GIT_USER_NAME:-}
+      - GIT_USER_EMAIL=${GIT_USER_EMAIL:-}
       - MIN_COMMITS=${MIN_COMMITS:-1}
       - MAX_COMMITS=${MAX_COMMITS:-5}
       - FREQUENCY=${FREQUENCY:-daily}
@@ -12,4 +18,14 @@ services:
       - CRON_MINUTE=${CRON_MINUTE:-30}
       - GIT_BRANCH=${GIT_BRANCH:-main}
       - TZ=${TZ:-UTC}
+      - LOG_FILE=/logs/autocommit.log
+    volumes:
+      - autocommit-repo:/app/repo
+      - autocommit-self:/data
+      - autocommit-logs:/logs
     restart: unless-stopped
+
+volumes:
+  autocommit-repo:
+  autocommit-self:
+  autocommit-logs:

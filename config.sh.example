@@ -37,9 +37,13 @@ GIT_USER_NAME=""
 GIT_USER_EMAIL=""
 
 # ── Git Remote ────────────────────────────────────────────────
-# Leave empty to skip push after commits
+# Destination: "separate" uses repo/; "self" commits to this fork's changelog.
+DESTINATION_MODE="separate"
+# Required for self; optional for separate (empty means local commits only).
 GIT_REMOTE=""
 GIT_BRANCH="main"
+# "gh" uses GitHub CLI credentials; "token" uses the URL token prompt or Git credentials.
+GIT_AUTH_METHOD=""
 
 # ── Install Directory (auto-set by install.sh) ───────────────
 INSTALL_DIR=""

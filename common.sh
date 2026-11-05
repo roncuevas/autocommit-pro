@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+# Shared configuration checks and safe runtime config writer.
+
+log_event() {
+    local level="$1" phase="$2" message="$3" line
+    line="[$(date '+%Y-%m-%d %H:%M:%S')] [$level] [$phase] $message"
+    if [[ -n "${LOG_FILE:-}" ]]; then
+        if ! printf '%s\n' "$line" >> "$LOG_FILE"; then
+            printf '%s\n' "$line" >&2
+        fi
+    fi
+    if [[ "${LOG_STDOUT:-0}" == 1 ]]; then printf '%s\n' "$line"; fi
+}
+
+log_unexpected_error() {
+    local status="$1"
+    # Never include BASH_COMMAND: it can contain a credential-bearing URL.
+    log_event ERROR "${CURRENT_PHASE:-startup}" "Unexpected command failure (exit ${status}); inspect the preceding phase and correct the reported condition."
+}
+
+install_error_trap() {
+    trap 'log_unexpected_error "$?"' ERR
+}
+
+cleanup_autocommit_lock() {
+    if [[ -n "${AUTOCOMMIT_LOCK_DIR:-}" && -d "$AUTOCOMMIT_LOCK_DIR" ]]; then
+        rm -rf "$AUTOCOMMIT_LOCK_DIR"
+    fi
+}
+
+set_defaults() {
+    : "${DESTINATION_MODE:=separate}"
+    : "${MIN_COMMITS:=1}"
+    : "${MAX_COMMITS:=5}"
+    : "${FREQUENCY:=daily}"
+    : "${WEEKLY_DAY:=1}"
+    : "${RANDOM_CHANCE:=50}"
+    : "${CRON_HOUR:=9}"
+    : "${CRON_MINUTE:=30}"
+    : "${GIT_REMOTE:=}"
+    : "${GIT_BRANCH:=main}"
+}
+
+normalize_uint() {
+    local value="$1"
+    [[ "$value" =~ ^[0-9]{1,10}$ ]] || return 1
+    value="${value#${value%%[!0]*}}"
+    [[ -n "$value" ]] || value=0
+    [[ ${#value} -le 10 ]] || return 1
+    [[ "$value" -le 2147483647 ]] || return 1
+    printf '%s' "$value"
+}
+
+is_uint() { normalize_uint "$1" >/dev/null; }
+
+is_range() {
+    local value
+    value=$(normalize_uint "$1") || return 1
+    [[ "$value" -ge "$2" && "$value" -le "$3" ]]
+}
+
+validate_config() {
+    local purpose="${1:-runtime}"
+    [[ "$DESTINATION_MODE" == "separate" || "$DESTINATION_MODE" == "self" ]] || { echo "DESTINATION_MODE must be separate or self." >&2; return 1; }
+    GIT_AUTH_METHOD="${GIT_AUTH_METHOD:-token}"
+    [[ "$GIT_AUTH_METHOD" == "gh" || "$GIT_AUTH_METHOD" == "token" ]] || { echo "GIT_AUTH_METHOD must be gh or token." >&2; return 1; }
+    local min_value max_value
+    min_value=$(normalize_uint "$MIN_COMMITS") || { echo "MIN_COMMITS must be an integer from 1 to 2147483647." >&2; return 1; }
+    max_value=$(normalize_uint "$MAX_COMMITS") || { echo "MAX_COMMITS must be an integer greater than or equal to MIN_COMMITS." >&2; return 1; }
+    [[ "$min_value" -ge 1 && "$max_value" -ge "$min_value" ]] || { echo "MAX_COMMITS must be an integer greater than or equal to MIN_COMMITS." >&2; return 1; }
+    MIN_COMMITS="$min_value"
+    MAX_COMMITS="$max_value"
+    [[ -n "${GIT_USER_NAME:-}" && -n "${GIT_USER_EMAIL:-}" ]] || { echo "GIT_USER_NAME and GIT_USER_EMAIL are required." >&2; return 1; }
+    [[ "$GIT_USER_NAME" != *$'\n'* && "$GIT_USER_EMAIL" != *$'\n'* ]] || { echo "Git identity values must each fit on one line." >&2; return 1; }
+    case "$FREQUENCY" in
+        daily|every2days) ;;
+        weekly) is_range "$WEEKLY_DAY" 1 7 || { echo "WEEKLY_DAY must be from 1 to 7." >&2; return 1; }; WEEKLY_DAY=$(normalize_uint "$WEEKLY_DAY") ;;
+        random) is_range "$RANDOM_CHANCE" 1 100 || { echo "RANDOM_CHANCE must be from 1 to 100." >&2; return 1; }; RANDOM_CHANCE=$(normalize_uint "$RANDOM_CHANCE") ;;
+        *) echo "FREQUENCY must be daily, weekly, every2days, or random." >&2; return 1 ;;
+    esac
+    if [[ "$purpose" == "installer" ]]; then
+        is_range "$CRON_HOUR" 0 23 || { echo "CRON_HOUR must be from 0 to 23." >&2; return 1; }
+        is_range "$CRON_MINUTE" 0 59 || { echo "CRON_MINUTE must be from 0 to 59." >&2; return 1; }
+        CRON_HOUR=$(normalize_uint "$CRON_HOUR")
+        CRON_MINUTE=$(normalize_uint "$CRON_MINUTE")
+    fi
+    if [[ "$DESTINATION_MODE" == "self" || -n "$GIT_REMOTE" ]]; then
+        [[ -n "$GIT_REMOTE" && -n "$GIT_BRANCH" ]] || { echo "GIT_REMOTE and GIT_BRANCH are required for a publishing destination." >&2; return 1; }
+    fi
+    if [[ -n "$GIT_REMOTE" && ! "$GIT_REMOTE" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+        echo "GIT_REMOTE must be a simple configured Git remote name." >&2
+        return 1
+    fi
+}
+
+strip_https_credentials() {
+    local url="$1" scheme rest authority path host
+    case "$url" in
+        https://*) ;;
+        *) printf '%s' "$url"; return 0 ;;
+    esac
+    scheme="${url%%://*}"
+    rest="${url#*://}"
+    authority="${rest%%/*}"
+    path="${rest#"$authority"}"
+    host="${authority##*@}"
+    printf '%s://%s%s' "$scheme" "$host" "$path"
+}
+
+write_runtime_config() {
+    local path="$1" source_file="${2:-$1}" temp install_dir="${INSTALL_DIR:-$(dirname "$1")}"
+    temp=$(mktemp "${path}.XXXXXX") || return 1
+    if [[ -f "$source_file" ]]; then
+        awk '!/^(DESTINATION_MODE|MIN_COMMITS|MAX_COMMITS|FREQUENCY|WEEKLY_DAY|RANDOM_CHANCE|CRON_HOUR|CRON_MINUTE|GIT_USER_NAME|GIT_USER_EMAIL|GIT_REMOTE|GIT_BRANCH|GIT_AUTH_METHOD|INSTALL_DIR)=/' "$source_file" > "$temp" || { rm -f "$temp"; return 1; }
+    fi
+    {
+        printf '\n# Generated by autocommit-pro. Re-run install.sh to change settings.\n'
+        printf 'DESTINATION_MODE=%q\n' "$DESTINATION_MODE"
+        printf 'MIN_COMMITS=%q\n' "$MIN_COMMITS"
+        printf 'MAX_COMMITS=%q\n' "$MAX_COMMITS"
+        printf 'FREQUENCY=%q\n' "$FREQUENCY"
+        printf 'WEEKLY_DAY=%q\n' "$WEEKLY_DAY"
+        printf 'RANDOM_CHANCE=%q\n' "$RANDOM_CHANCE"
+        printf 'CRON_HOUR=%q\n' "$CRON_HOUR"
+        printf 'CRON_MINUTE=%q\n' "$CRON_MINUTE"
+        printf 'GIT_USER_NAME=%q\n' "$GIT_USER_NAME"
+        printf 'GIT_USER_EMAIL=%q\n' "$GIT_USER_EMAIL"
+        printf 'GIT_REMOTE=%q\n' "$GIT_REMOTE"
+        printf 'GIT_BRANCH=%q\n' "$GIT_BRANCH"
+        printf 'GIT_AUTH_METHOD=%q\n' "$GIT_AUTH_METHOD"
+        printf 'INSTALL_DIR=%q\n' "$install_dir"
+    } >> "$temp" || { rm -f "$temp"; return 1; }
+    if ! chmod 600 "$temp" || ! mv -f "$temp" "$path"; then
+        rm -f "$temp"
+        return 1
+    fi
+}
+
+acquire_autocommit_lock() {
+    local repo="$1" key uid lock_base
+    key=$(printf '%s' "$repo" | cksum | awk '{print $1}') || return 1
+    uid=$(id -u) || return 1
+    lock_base="${TMPDIR:-/tmp}/autocommit-pro-${uid}-${key}.lock"
+    if ! mkdir "$lock_base" 2>/dev/null; then
+        echo "Another run is active or a stale lock exists at ${lock_base}." >&2
+        return 1
+    fi
+    AUTOCOMMIT_LOCK_DIR="$lock_base"
+    if ! printf '%s\n' "$$" > "$AUTOCOMMIT_LOCK_DIR/pid"; then
+        rmdir "$AUTOCOMMIT_LOCK_DIR" 2>/dev/null || true
+        AUTOCOMMIT_LOCK_DIR=""
+        return 1
+    fi
+    trap cleanup_autocommit_lock EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+}

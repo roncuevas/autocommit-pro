@@ -1,10 +1,10 @@
 FROM alpine:3.21
 
-RUN apk add --no-cache bash git tzdata
+RUN apk add --no-cache bash git github-cli tzdata
 
 WORKDIR /app
 
-COPY autocommit.sh config.sh.example entrypoint.sh ./
+COPY autocommit.sh common.sh config.sh.example entrypoint.sh ./
 
 RUN chmod +x entrypoint.sh
 

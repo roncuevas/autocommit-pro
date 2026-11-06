@@ -19,7 +19,7 @@ The shell scripts and one shared helper form the system:
 
 **Key architectural decision:** `DESTINATION_MODE=separate` uses the independent, gitignored `repo/`; `self` writes only to `CHANGELOG.md` in the fork checkout and uses a selected branch separate from `main` (default `autocommit-pro`). Both destinations refuse dirty worktrees and never force-push. Docker destinations live in persistent volumes.
 
-**Git auth:** `GIT_AUTH_METHOD=gh` uses `gh auth login` and the official `gh auth setup-git` credential helper for HTTPS GitHub remotes; Docker requires `GH_TOKEN` or `GITHUB_TOKEN`. `token` retains URL-token or existing Git credential behavior. Never log raw Git stderr from credentialed remotes.
+**Git auth:** The installer asks for `GIT_AUTH_METHOD` before Git identity. In `gh` mode it suggests profile name/login and primary verified email through `gh api`; email lookup failure falls back to manual input without requesting extra scopes. In `token` mode identity remains manual and the token is not used for profile API calls. `gh auth setup-git` configures the official helper for HTTPS GitHub remotes; Docker requires `GH_TOKEN` or `GITHUB_TOKEN`. Never log raw Git stderr from credentialed remotes.
 
 ## Key Commands
 

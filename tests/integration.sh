@@ -67,7 +67,7 @@ cat >/dev/null
 touch "${TMP_ROOT}/crontab-was-written"
 EOF
 chmod +x "${TMP_ROOT}/bin/crontab"
-printf 'Tester\ntest@example.invalid\n5\n2\ndaily\nseparate\nmain\ntoken\n9\n30\n' | TMP_ROOT="$TMP_ROOT" PATH="${TMP_ROOT}/bin:$PATH" bash "${INSTALL_FIXTURE}/install.sh" >"${TMP_ROOT}/installer.out" 2>&1 && { echo 'not ok - installer rejects invalid commit range' >&2; exit 1; }
+printf 'token\nTester\ntest@example.invalid\n5\n2\ndaily\nseparate\nmain\n9\n30\n' | TMP_ROOT="$TMP_ROOT" PATH="${TMP_ROOT}/bin:$PATH" bash "${INSTALL_FIXTURE}/install.sh" >"${TMP_ROOT}/installer.out" 2>&1 && { echo 'not ok - installer rejects invalid commit range' >&2; exit 1; }
 [[ ! -e "${INSTALL_FIXTURE}/config.sh" && ! -e "${INSTALL_FIXTURE}/repo" && ! -e "${TMP_ROOT}/crontab-was-written" ]]
 pass "rejects invalid installer input before filesystem and cron changes"
 
@@ -94,12 +94,18 @@ if [[ "\${1:-}" == -l ]]; then
 fi
 cat > "$TMP_ROOT/cron-state"
 EOF
-chmod +x "${TMP_ROOT}/installer-bin/git" "${TMP_ROOT}/installer-bin/crontab"
-printf "Aarón 'Test'\ntest@example.invalid\n1\n1\ndaily\nseparate\nmain\ntoken\n9\n30\nhttps://mock.invalid/installer.git\n" | PATH="${TMP_ROOT}/installer-bin:$PATH" /bin/bash "${VALID_INSTALL}/install.sh" >"${TMP_ROOT}/installer-success.out" 2>&1
+cat > "${TMP_ROOT}/installer-bin/gh" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == api ]]; then touch "$TMP_ROOT/token-gh-api-called"; exit 1; fi
+exit 1
+EOF
+chmod +x "${TMP_ROOT}/installer-bin/git" "${TMP_ROOT}/installer-bin/gh" "${TMP_ROOT}/installer-bin/crontab"
+printf "token\nAarón 'Test'\ntest@example.invalid\n1\n1\ndaily\nseparate\nmain\n9\n30\nhttps://mock.invalid/installer.git\n" | PATH="${TMP_ROOT}/installer-bin:$PATH" /bin/bash "${VALID_INSTALL}/install.sh" >"${TMP_ROOT}/installer-success.out" 2>&1
 source "${VALID_INSTALL}/config.sh"
 [[ "$GIT_USER_NAME" == "Aarón 'Test'" && "$GIT_REMOTE" == origin && "$GIT_BRANCH" == main ]]
 [[ -f "${TMP_ROOT}/cron-state" && "$(git --git-dir="$INSTALL_REMOTE" rev-list --count main)" == 1 ]]
 grep -q '# autocommit-pro' "${TMP_ROOT}/cron-state"
+[[ ! -e "${TMP_ROOT}/token-gh-api-called" ]]
 pass "successful installer stores shell-safe identity, pushes, and installs cron"
 
 # The local gh path completes browser login when needed and configures Git's helper.
@@ -118,21 +124,38 @@ exec "$REAL_GIT" "\${args[@]}"
 EOF
 cat > "${TMP_ROOT}/gh-installer-bin/gh" <<EOF
 #!/usr/bin/env bash
-case "\$*" in
-    'auth status '*) [[ -f "$TMP_ROOT/gh-login-complete" ]] ;;
-    'auth login '*) touch "$TMP_ROOT/gh-login-complete" ;;
-    'auth setup-git '*) echo "\$*" >> "$TMP_ROOT/gh-commands" ;;
+case "\${1:-} \${2:-}" in
+    'auth status') [[ -f "$TMP_ROOT/gh-login-complete" ]] ;;
+    'auth login') touch "$TMP_ROOT/gh-login-complete" ;;
+    'auth setup-git') echo "\$*" >> "$TMP_ROOT/gh-commands" ;;
+    'api user') printf '%s\\n' 'GitHub Sample User' ;;
+    'api user/emails')
+        [[ ! -f "$TMP_ROOT/gh-no-email" ]] || exit 1
+        printf '%s\\n' 'github-sample@example.invalid'
+        ;;
     *) exit 2 ;;
 esac
 EOF
 cp "${TMP_ROOT}/installer-bin/crontab" "${TMP_ROOT}/gh-installer-bin/crontab"
 chmod +x "${TMP_ROOT}/gh-installer-bin/git" "${TMP_ROOT}/gh-installer-bin/gh" "${TMP_ROOT}/gh-installer-bin/crontab"
-printf "Tester\ntest@example.invalid\n1\n1\ndaily\nseparate\nmain\ngh\n9\n30\nhttps://github.com/test/gh-install.git\n" | PATH="${TMP_ROOT}/gh-installer-bin:$PATH" /bin/bash "${GH_INSTALL}/install.sh" >"${TMP_ROOT}/gh-installer.out" 2>&1
+printf "gh\n\n\n\n\n\n\n\n\n\nhttps://github.com/test/gh-install.git\n" | PATH="${TMP_ROOT}/gh-installer-bin:$PATH" /bin/bash "${GH_INSTALL}/install.sh" >"${TMP_ROOT}/gh-installer.out" 2>&1
 source "${GH_INSTALL}/config.sh"
 [[ "$GIT_AUTH_METHOD" == gh && -f "${TMP_ROOT}/gh-login-complete" ]]
+[[ "$GIT_USER_NAME" == 'GitHub Sample User' && "$GIT_USER_EMAIL" == 'github-sample@example.invalid' ]]
 grep -q 'auth setup-git --force --hostname github.com' "${TMP_ROOT}/gh-commands"
 [[ "$(git --git-dir="$GH_REMOTE" rev-list --count main)" == 1 ]]
-pass "installer runs gh login when needed and configures gh as Git credential helper"
+pass "installer authenticates first and suggests the GitHub profile identity"
+
+# Missing email access falls back to a manual value without requesting extra scopes.
+touch "${TMP_ROOT}/gh-no-email"
+git -C "${GH_INSTALL}/repo" remote set-url origin https://github.com/test/gh-install.git
+awk '!/^GIT_USER_EMAIL=/' "${GH_INSTALL}/config.sh" > "${GH_INSTALL}/config.sh.tmp"
+mv "${GH_INSTALL}/config.sh.tmp" "${GH_INSTALL}/config.sh"
+printf "\n\nmanual@example.invalid\n\n\n\n\n\n\n\n\n" | PATH="${TMP_ROOT}/gh-installer-bin:$PATH" /bin/bash "${GH_INSTALL}/install.sh" >"${TMP_ROOT}/gh-installer-fallback.out" 2>&1
+source "${GH_INSTALL}/config.sh"
+[[ "$GIT_USER_NAME" == 'GitHub Sample User' && "$GIT_USER_EMAIL" == manual@example.invalid ]]
+grep -q 'Could not retrieve the primary verified GitHub email' "${TMP_ROOT}/gh-installer-fallback.out"
+pass "installer asks for email manually when gh cannot read it"
 
 # Self installation creates/publishes the selected non-main branch and leaves main unchanged.
 SELF_INSTALL="${TMP_ROOT}/self-installer"
@@ -151,7 +174,7 @@ cp "${TMP_ROOT}/installer-bin/crontab" "${TMP_ROOT}/self-installer-crontab"
 chmod +x "${TMP_ROOT}/self-installer-crontab"
 mkdir -p "${TMP_ROOT}/self-installer-bin"
 cp "${TMP_ROOT}/self-installer-crontab" "${TMP_ROOT}/self-installer-bin/crontab"
-printf "Tester\ntest@example.invalid\n1\n1\ndaily\nself\nactivity-log\ntoken\n9\n30\n" | PATH="${TMP_ROOT}/self-installer-bin:$PATH" bash "${SELF_INSTALL}/install.sh" >"${TMP_ROOT}/self-installer.out" 2>&1
+printf "token\nTester\ntest@example.invalid\n1\n1\ndaily\nself\nactivity-log\n9\n30\n" | PATH="${TMP_ROOT}/self-installer-bin:$PATH" bash "${SELF_INSTALL}/install.sh" >"${TMP_ROOT}/self-installer.out" 2>&1
 source "${SELF_INSTALL}/config.sh"
 [[ "$GIT_BRANCH" == activity-log && "$(git -C "$SELF_INSTALL" branch --show-current)" == activity-log ]]
 [[ "$(git --git-dir="$SELF_INSTALL_REMOTE" rev-parse main)" == "$SELF_MAIN_BEFORE" ]]

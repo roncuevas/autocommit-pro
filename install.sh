@@ -59,17 +59,6 @@ fi
 info "GitHub requires a commit email linked to your account: https://github.com/settings/emails"
 echo ""
 
-ask_or_keep "Git user name" "${GIT_USER_NAME:-}" INPUT_GIT_NAME
-ask_or_keep "Git email (must match your GitHub account)" "${GIT_USER_EMAIL:-}" INPUT_GIT_EMAIL
-ask_or_keep "Min commits per run" "$MIN_COMMITS" INPUT_MIN_COMMITS
-ask_or_keep "Max commits per run" "$MAX_COMMITS" INPUT_MAX_COMMITS
-ask_or_keep "Frequency (daily/weekly/every2days/random)" "$FREQUENCY" INPUT_FREQUENCY
-ask_or_keep "Destination (separate/self)" "$DESTINATION_MODE" INPUT_DESTINATION_MODE
-BRANCH_DEFAULT="$GIT_BRANCH"
-if [[ "$INPUT_DESTINATION_MODE" == "self" && ( "$BRANCH_DEFAULT" == "main" || "$BRANCH_DEFAULT" == "master" ) ]]; then
-    BRANCH_DEFAULT="autocommit-pro"
-fi
-ask_or_keep "Branch for commits" "$BRANCH_DEFAULT" INPUT_GIT_BRANCH
 AUTH_DEFAULT="${GIT_AUTH_METHOD:-}"
 if [[ -z "$AUTH_DEFAULT" ]]; then
     if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
@@ -79,6 +68,52 @@ if [[ -z "$AUTH_DEFAULT" ]]; then
     fi
 fi
 ask_or_keep "GitHub authentication (gh/token)" "$AUTH_DEFAULT" INPUT_GIT_AUTH_METHOD
+
+GH_PROFILE_NAME=""
+GH_PROFILE_EMAIL=""
+if [[ "$INPUT_GIT_AUTH_METHOD" == "gh" ]]; then
+    CURRENT_PHASE="GitHub authentication"
+    if ! command -v gh >/dev/null 2>&1; then
+        err "GitHub CLI was selected. Install gh, then rerun install.sh."
+        exit 1
+    fi
+    if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+        info "Starting GitHub CLI login. Complete the browser/device flow to continue."
+        if ! gh auth login --hostname github.com --git-protocol https; then
+            err "GitHub CLI login did not complete. No configuration or cron changes were made."
+            exit 1
+        fi
+    fi
+    if ! gh auth status --hostname github.com >/dev/null 2>&1; then
+        err "GitHub CLI is not authenticated for github.com. Run 'gh auth login' and retry."
+        exit 1
+    fi
+    GH_PROFILE_NAME=$(gh api user --jq '.name // empty' 2>/dev/null || true)
+    if [[ -z "$GH_PROFILE_NAME" ]]; then
+        GH_PROFILE_NAME=$(gh api user --jq '.login // empty' 2>/dev/null || true)
+    fi
+    GH_PROFILE_EMAIL=$(gh api user/emails --jq '[.[] | select(.primary == true and .verified == true) | .email][0] // empty' 2>/dev/null || true)
+    if [[ -z "$GH_PROFILE_NAME" ]]; then
+        info "Could not retrieve a GitHub profile name; enter the Git author name manually."
+    fi
+    if [[ -z "$GH_PROFILE_EMAIL" ]]; then
+        info "Could not retrieve the primary verified GitHub email; enter a linked or noreply email manually."
+    fi
+fi
+
+NAME_DEFAULT="${GIT_USER_NAME:-$GH_PROFILE_NAME}"
+EMAIL_DEFAULT="${GIT_USER_EMAIL:-$GH_PROFILE_EMAIL}"
+ask_or_keep "Git user name" "$NAME_DEFAULT" INPUT_GIT_NAME
+ask_or_keep "Git email (must match your GitHub account)" "$EMAIL_DEFAULT" INPUT_GIT_EMAIL
+ask_or_keep "Min commits per run" "$MIN_COMMITS" INPUT_MIN_COMMITS
+ask_or_keep "Max commits per run" "$MAX_COMMITS" INPUT_MAX_COMMITS
+ask_or_keep "Frequency (daily/weekly/every2days/random)" "$FREQUENCY" INPUT_FREQUENCY
+ask_or_keep "Destination (separate/self)" "$DESTINATION_MODE" INPUT_DESTINATION_MODE
+BRANCH_DEFAULT="$GIT_BRANCH"
+if [[ "$INPUT_DESTINATION_MODE" == "self" && ( "$BRANCH_DEFAULT" == "main" || "$BRANCH_DEFAULT" == "master" ) ]]; then
+    BRANCH_DEFAULT="autocommit-pro"
+fi
+ask_or_keep "Branch for commits" "$BRANCH_DEFAULT" INPUT_GIT_BRANCH
 
 INPUT_WEEKLY_DAY="$WEEKLY_DAY"
 INPUT_RANDOM_CHANCE="$RANDOM_CHANCE"
@@ -147,21 +182,6 @@ if [[ "$GIT_AUTH_METHOD" == "gh" && ( "$DESTINATION_MODE" == "self" || -n "$REMO
     REMOTE_URL=$(strip_https_credentials "$REMOTE_URL")
     if [[ "$REMOTE_URL" != https://github.com/* ]]; then
         err "GitHub CLI authentication requires an HTTPS remote on github.com."
-        exit 1
-    fi
-    if ! command -v gh >/dev/null 2>&1; then
-        err "GitHub CLI was selected. Install gh, run 'gh auth login', and rerun install.sh."
-        exit 1
-    fi
-    if ! gh auth status --hostname github.com >/dev/null 2>&1; then
-        info "Starting GitHub CLI login. Complete the browser/device flow to continue."
-        if ! gh auth login --hostname github.com --git-protocol https; then
-            err "GitHub CLI login did not complete. No configuration or cron changes were made."
-            exit 1
-        fi
-    fi
-    if ! gh auth status --hostname github.com >/dev/null 2>&1; then
-        err "GitHub CLI is not authenticated for github.com. Run 'gh auth login' and retry."
         exit 1
     fi
     if ! gh auth setup-git --force --hostname github.com >/dev/null 2>&1; then

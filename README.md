@@ -30,16 +30,16 @@ cd autocommit-pro
 El instalador valida todos los valores antes de guardar la configuración o cambiar cron. También permite elegir la rama de destino. En modo `self` propone `autocommit-pro` para mantener los commits automáticos fuera de `main`; puedes elegir otra rama, pero `main` y `master` no se permiten para ese modo. Si `gh` ya está instalado y autenticado, propone usarlo; también puedes elegir autenticación por URL/token. Se encarga de:
 
 1. Crear `config.sh` a partir del template
-2. Pedir tu **nombre y email de Git** (requerido para que GitHub reconozca tus contribuciones)
-3. Elegir el destino: el repositorio separado `repo/` o el changelog de tu fork (`self`)
-4. Configurar autenticación con GitHub CLI o por URL/token
+2. Elegir autenticación con GitHub CLI (`gh`) o token
+3. Pedir tu **nombre y email de Git**; con `gh` se sugieren los datos del perfil y puedes editarlos
+4. Elegir el destino: el repositorio separado `repo/` o el changelog de tu fork (`self`)
 5. Para el destino separado, preguntar por la URL del remote de GitHub (debe iniciar con `https://`)
-6. Para el destino separado, hacer un push inicial sin forzar el historial remoto
+6. Hacer el push inicial de la rama elegida sin forzar el historial remoto
 7. Instalar o reemplazar el cron job solo cuando la configuración y el repositorio estén listos
 
 ### Autenticación con GitHub CLI
 
-Elige `gh` durante la instalación. Si aún no hay una sesión activa, el instalador inicia `gh auth login`; después ejecuta `gh auth setup-git --force --hostname github.com` para que Git use el helper oficial de `gh`, incluso si la sesión viene de `GH_TOKEN`. El remote queda sin token incrustado.
+Elige `gh` al inicio de la instalación. Si aún no hay una sesión activa, el instalador inicia `gh auth login`. Luego sugiere el nombre del perfil (o el login si no hay nombre) y el email principal verificado, consultados mediante GitHub CLI. Puedes aceptar o editar ambos valores. Si el email no está disponible con los permisos actuales, el instalador lo pide manualmente y no solicita alcances adicionales. Después ejecuta `gh auth setup-git --force --hostname github.com` para que Git use el helper oficial de `gh`, incluso si la sesión viene de `GH_TOKEN`. El remote queda sin token incrustado.
 
 Puedes iniciar sesión antes de instalar con:
 
@@ -53,7 +53,7 @@ Consulta la documentación oficial de [`gh auth login`](https://cli.github.com/m
 
 ### Autenticación con token
 
-El instalador acepta dos formas de autenticacion:
+En modo `token`, el nombre y el email se ingresan manualmente; el token se usa para Git y no se consulta la API de perfil. El instalador acepta dos formas de autenticacion:
 
 - **URL con token embebido:** pegar directamente la URL completa
   ```
